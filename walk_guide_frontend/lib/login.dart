@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'widgets/custom_widgets.dart'; // 공통 위젯 임포트
+import 'package:google_fonts/google_fonts.dart';
+import 'SignUp.dart';
+import 'ResetPW.dart';
 
 void main() {
   runApp(const WalkGuideApp());
@@ -109,11 +112,11 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 90),
 
                     // Login 서브 타이틀
-                    const Text(
+                    Text(
                       'Login',
-                      style: TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 28,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: primaryGreen,
                       ),
                     ),
@@ -147,15 +150,23 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 13),
 
                     // 7. 비밀번호 재설정 / 회원가입 링크
+                    // 비밀번호 재설정 / 회원가입 링크 부분
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ResetPW(),
+                              ),
+                            );
+                          },
                           child: const Text(
                             '비밀번호 재설정',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: Colors.black87,
                             ),
                           ),
@@ -168,18 +179,24 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SignUp(),
+                              ),
+                            );
+                          },
                           child: const Text(
                             '회원가입',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: Colors.black87,
                             ),
                           ),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 6.5),
 
                     // 8. 구분선
