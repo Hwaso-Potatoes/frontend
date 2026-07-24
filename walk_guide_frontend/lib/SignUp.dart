@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
-//이미지말고 최대한 폰트를 사용해보려고 flutter pub add google_fonts 터미널에 이거 기입 후 임포트함.
+import 'widgets/custom_widgets.dart';
+import 'services/api_service.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
@@ -18,6 +18,7 @@ class _SignUpState extends State<SignUp> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,6 +29,114 @@ class _SignUpState extends State<SignUp> {
     super.dispose();
   }
 
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  bool _isValidPhone(String phone) {
+    final cleanPhone = phone.replaceAll('-', '');
+    return RegExp(r'^01[016789]\d{7,8}$').hasMatch(cleanPhone);
+  }
+
+  Future<void> _handleSignUp() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+    final phone = _phoneController.text.trim();
+
+    if (email.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '이메일을 입력해주세요.');
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      showCustomDialog(
+        context: context,
+        title: '입력 오류',
+        message: '올바른 이메일 형식이 아닙니다.',
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '비밀번호를 입력해주세요.');
+      return;
+    }
+
+    if (password.length < 6) {
+      showCustomDialog(
+        context: context,
+        title: '입력 오류',
+        message: '비밀번호는 최소 6자리 이상이어야 합니다.',
+      );
+      return;
+    }
+
+    if (confirmPassword.isEmpty) {
+      showCustomDialog(
+        context: context,
+        title: '안내',
+        message: '비밀번호 확인을 입력해주세요.',
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      showCustomDialog(
+        context: context,
+        title: '비밀번호 불일치',
+        message: '비밀번호가 서로 일치하지 않습니다.',
+      );
+      return;
+    }
+
+    if (phone.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '전화번호를 입력해주세요.');
+      return;
+    }
+
+    if (!_isValidPhone(phone)) {
+      showCustomDialog(
+        context: context,
+        title: '입력 오류',
+        message: '올바른 전화번호 형식이 아닙니다.',
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ApiService.signUp(email, password, phone);
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await showCustomDialog(
+          context: context,
+          title: '회원가입 완료',
+          message: result['message'] ?? '회원가입이 정상적으로 완료되었습니다.',
+        );
+        if (mounted) Navigator.pop(context);
+      } else {
+        await showCustomDialog(
+          context: context,
+          title: '회원가입 실패',
+          message: result['message'] ?? '회원가입 처리에 실패했습니다.',
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+      showCustomDialog(
+        context: context,
+        title: '오류',
+        message: '서버와의 통신 중 오류가 발생했습니다.',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,7 +144,6 @@ class _SignUpState extends State<SignUp> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. 배경 파동 이미지 (시안 위치 적용)
           Positioned(
             top: 230,
             left: 0,
@@ -46,8 +154,6 @@ class _SignUpState extends State<SignUp> {
               fit: BoxFit.fill,
             ),
           ),
-
-          // 2. 나무 이미지 (시안 위치 적용)
           Positioned(
             top: 103,
             left: 269,
@@ -55,8 +161,6 @@ class _SignUpState extends State<SignUp> {
             height: 147,
             child: Image.asset('assets/images/trees.png', fit: BoxFit.contain),
           ),
-
-          // 3. 메인 콘텐츠
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -68,8 +172,6 @@ class _SignUpState extends State<SignUp> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 228),
-
-                    // 로그인으로 돌아가기 버튼
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Row(
@@ -89,8 +191,6 @@ class _SignUpState extends State<SignUp> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // Title
                     Text(
                       'Sign Up',
                       style: GoogleFonts.inter(
@@ -100,43 +200,37 @@ class _SignUpState extends State<SignUp> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // 입력 폼 필드들
                     CustomTextField(
                       controller: _emailController,
                       hintText: 'E-mail',
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-
                     CustomTextField(
                       controller: _passwordController,
                       hintText: 'Password',
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
-
                     CustomTextField(
                       controller: _confirmPasswordController,
                       hintText: 'Confirm Password',
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
-
                     CustomTextField(
                       controller: _phoneController,
                       hintText: 'Phone',
                       keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 12),
-
-                    // 회원가입 버튼
-                    CustomButton(
-                      text: '회원가입',
-                      onPressed: () {
-                        print('회원가입 시도: ${_emailController.text}');
-                      },
-                    ),
+                    _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: primaryGreen,
+                            ),
+                          )
+                        : CustomButton(text: '회원가입', onPressed: _handleSignUp),
                     const SizedBox(height: 20),
                   ],
                 ),

@@ -1,31 +1,11 @@
 import 'package:flutter/material.dart';
-import 'widgets/custom_widgets.dart'; // 공통 위젯 임포트
 import 'package:google_fonts/google_fonts.dart';
+import 'widgets/custom_widgets.dart';
+import 'services/api_service.dart';
 import 'SignUp.dart';
 import 'ResetPW.dart';
 
-void main() {
-  runApp(const WalkGuideApp());
-}
-
 const Color primaryGreen = Color(0xFF27722F);
-
-class WalkGuideApp extends StatelessWidget {
-  const WalkGuideApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Walk Guide',
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFF8F9E5),
-        useMaterial3: true,
-      ),
-      home: const LoginPage(),
-    );
-  }
-}
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -37,12 +17,81 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '이메일을 입력해주세요.');
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      showCustomDialog(
+        context: context,
+        title: '입력 오류',
+        message: '올바른 이메일 형식이 아닙니다.',
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '비밀번호를 입력해주세요.');
+      return;
+    }
+
+    if (password.length < 6) {
+      showCustomDialog(
+        context: context,
+        title: '입력 오류',
+        message: '비밀번호는 최소 6자리 이상이어야 합니다.',
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ApiService.login(email, password);
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        await showCustomDialog(
+          context: context,
+          title: '로그인 성공',
+          message: result['message'] ?? '로그인되었습니다.',
+        );
+      } else {
+        await showCustomDialog(
+          context: context,
+          title: '로그인 실패',
+          message: result['message'] ?? '이메일 또는 비밀번호를 확인해주세요.',
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+      showCustomDialog(
+        context: context,
+        title: '오류',
+        message: '서버와의 통신 중 오류가 발생했습니다.',
+      );
+    }
   }
 
   @override
@@ -52,7 +101,6 @@ class _LoginPageState extends State<LoginPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. 배경 파동 이미지 (top: 415 -> 400으로 15px 위로 이동)
           Positioned(
             top: 400,
             left: 0,
@@ -63,8 +111,6 @@ class _LoginPageState extends State<LoginPage> {
               fit: BoxFit.fill,
             ),
           ),
-
-          // 2. 나무 이미지 (top: 290 -> 275로 15px 위로 이동)
           Positioned(
             top: 275,
             left: 269,
@@ -72,8 +118,6 @@ class _LoginPageState extends State<LoginPage> {
             height: 147,
             child: Image.asset('assets/images/trees.png', fit: BoxFit.contain),
           ),
-
-          // 3. 메인 콘텐츠
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -84,10 +128,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 상단 여백 (125 -> 110으로 15px 줄임)
                     const SizedBox(height: 110),
-
-                    // 메인 로고 이미지
                     Center(
                       child: Image.asset(
                         'assets/images/Walk_Guide_text.png',
@@ -96,8 +137,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 1),
-
-                    // 메인 서브 타이틀
                     const Center(
                       child: Text(
                         '매일 산책이, 우리 아이의 진화가 되는 순간',
@@ -108,10 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 90),
-
-                    // Login 서브 타이틀
                     Text(
                       'Login',
                       style: GoogleFonts.inter(
@@ -121,36 +157,24 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // 4. 이메일 입력창
                     CustomTextField(
                       controller: _emailController,
                       hintText: 'E-mail',
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-
-                    // 5. 비밀번호 입력창
                     CustomTextField(
                       controller: _passwordController,
                       hintText: 'Password',
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
-
-                    // 6. 로그인 버튼
-                    CustomButton(
-                      text: '로그인',
-                      onPressed: () {
-                        final email = _emailController.text;
-                        final password = _passwordController.text;
-                        print('로그인 버튼 클릭 - 이메일: $email, 비밀번호: $password');
-                      },
-                    ),
+                    _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(color: primaryGreen),
+                          )
+                        : CustomButton(text: '로그인', onPressed: _handleLogin),
                     const SizedBox(height: 13),
-
-                    // 7. 비밀번호 재설정 / 회원가입 링크
-                    // 비밀번호 재설정 / 회원가입 링크 부분
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -198,8 +222,6 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                     const SizedBox(height: 6.5),
-
-                    // 8. 구분선
                     Row(
                       children: const [
                         Expanded(child: Divider(color: Colors.black26)),
@@ -216,15 +238,12 @@ class _LoginPageState extends State<LoginPage> {
                         Expanded(child: Divider(color: Colors.black26)),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
-                    // 9. 소셜 로그인 이미지 아이콘 그룹
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () => print('구글 로그인'),
+                          onTap: () {},
                           child: Image.asset(
                             'assets/images/google.png',
                             width: 46,
@@ -233,7 +252,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(width: 20),
                         GestureDetector(
-                          onTap: () => print('애플 로그인'),
+                          onTap: () {},
                           child: Image.asset(
                             'assets/images/apple.png',
                             width: 46,
@@ -242,7 +261,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(width: 20),
                         GestureDetector(
-                          onTap: () => print('카카오 로그인'),
+                          onTap: () {},
                           child: Image.asset(
                             'assets/images/kakao.png',
                             width: 46,

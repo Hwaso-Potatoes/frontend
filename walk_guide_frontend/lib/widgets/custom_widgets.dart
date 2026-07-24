@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-// 메인 테마 그린 컬러
 const Color primaryGreen = Color(0xFF27722F);
 
-/// 공통 입력창 (E-mail, Password, 이름 등)
+// CustomTextField
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
@@ -20,29 +19,26 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 336,
-        height: 49,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: primaryGreen, width: 1),
+    return SizedBox(
+      height: 48,
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 14, color: Colors.black87),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(fontSize: 14, color: Colors.black38),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          filled: true,
+          fillColor: Colors.white,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            borderSide: const BorderSide(color: Color(0xFFC8E6C9), width: 1.0),
           ),
-          child: TextField(
-            controller: controller,
-            obscureText: obscureText,
-            keyboardType: keyboardType,
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 12.0,
-              ),
-            ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            borderSide: const BorderSide(color: primaryGreen, width: 1.5),
           ),
         ),
       ),
@@ -50,7 +46,7 @@ class CustomTextField extends StatelessWidget {
   }
 }
 
-/// 공통 초록색 버튼 (로그인, 회원가입, 다음으로 등)
+// CustomButton
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -59,26 +55,69 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 336,
-        height: 49,
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryGreen,
-            foregroundColor: Colors.white,
-            elevation: 3,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryGreen,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
           ),
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
       ),
     );
   }
+}
+
+// CustomDialog (Future<void> 반환으로 수정)
+Future<void> showCustomDialog({
+  required BuildContext context,
+  required String title,
+  required String message,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: primaryGreen,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 14, color: Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              '확인',
+              style: TextStyle(
+                color: primaryGreen,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
