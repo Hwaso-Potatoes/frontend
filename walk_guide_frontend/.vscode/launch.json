@@ -8,7 +8,7 @@
       "name": "walk_guide_frontend",
       "request": "launch",
       "type": "dart",
-      "program": "lib/login.dart"
+      "program": "lib/main.dart"
     },
     {
       "name": "walk_guide_frontend (profile mode)",

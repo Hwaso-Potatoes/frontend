@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/custom_widgets.dart';
 import 'services/api_service.dart';
+import 'SignUpInfo1.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
@@ -38,7 +39,7 @@ class _SignUpState extends State<SignUp> {
     return RegExp(r'^01[016789]\d{7,8}$').hasMatch(cleanPhone);
   }
 
-  Future<void> _handleSignUp() async {
+  Future<void> _handleNextStep() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -113,17 +114,18 @@ class _SignUpState extends State<SignUp> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        await showCustomDialog(
-          context: context,
-          title: '회원가입 완료',
-          message: result['message'] ?? '회원가입이 정상적으로 완료되었습니다.',
+        final String userId = result['user_id']?.toString() ?? '1';
+
+        // 💡 "회원가입 완료" 팝업 없이, 방금 생성된 userId를 들고 즉시 SignUpInfo1 화면으로 이동합니다!
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SignUpInfo1(userId: userId)),
         );
-        if (mounted) Navigator.pop(context);
       } else {
         await showCustomDialog(
           context: context,
-          title: '회원가입 실패',
-          message: result['message'] ?? '회원가입 처리에 실패했습니다.',
+          title: '오류',
+          message: result['message'] ?? '처리 중 오류가 발생했습니다.',
         );
       }
     } catch (e) {
@@ -230,7 +232,7 @@ class _SignUpState extends State<SignUp> {
                               color: primaryGreen,
                             ),
                           )
-                        : CustomButton(text: '회원가입', onPressed: _handleSignUp),
+                        : CustomButton(text: '다음', onPressed: _handleNextStep),
                     const SizedBox(height: 20),
                   ],
                 ),
