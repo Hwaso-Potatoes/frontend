@@ -3,6 +3,7 @@ import 'widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/api_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'home.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -76,14 +77,25 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
       if (!mounted) return;
 
       if (userRes['success'] == true && petRes['success'] == true) {
-        await showCustomDialog(
-          context: context,
-          title: '완료',
-          message: '정보 등록이 완료되었습니다!',
+        // 성공 후 HomeScreen 전환도 순수 Fade 적용
+        Navigator.pushAndRemoveUntil(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const HomeScreen(showPermissionDialog: true),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: animation.drive(
+                      CurveTween(curve: Curves.easeInOut),
+                    ),
+                    child: child,
+                  );
+                },
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+          (route) => false,
         );
-
-        if (!mounted) return;
-        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         final errorMsg =
             userRes['message'] ?? petRes['message'] ?? '등록에 실패했습니다.';
@@ -108,7 +120,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. 커스텀 상단바 (Info1 디자인과 통일)
+            // 1. 커스텀 상단바
             Padding(
               padding: const EdgeInsets.only(top: 79.0),
               child: SizedBox(
@@ -127,7 +139,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         ),
                       ),
                     ),
-
                     Positioned(
                       left: 20.0,
                       child: IconButton(
@@ -146,7 +157,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
               ),
             ),
 
-            // 2. 상단바 ~ 진행바 사이 여백
             const SizedBox(height: 30),
 
             // 3. 본문 영역
@@ -156,23 +166,26 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 진행 바 (3/3 완료 지점)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: const LinearProgressIndicator(
-                          value: 1.0,
-                          backgroundColor: Color(0xFFEAE7DE),
-                          color: Color(0xFF72AA4F),
-                          minHeight: 10,
-                        ),
+                    // 진행 바 (0.66 -> 1.0)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: TweenAnimationBuilder<double>(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                        tween: Tween<double>(begin: 0.66, end: 1.0),
+                        builder: (context, value, child) {
+                          return LinearProgressIndicator(
+                            value: value,
+                            backgroundColor: const Color(0xFFEAE7DE),
+                            color: const Color(0xFF72AA4F),
+                            minHeight: 10,
+                          );
+                        },
                       ),
                     ),
 
                     Stack(
                       children: [
-                        // 1. 우리아이 텍스트
                         Padding(
                           padding: const EdgeInsets.only(top: 30.0),
                           child: SizedBox(
@@ -189,8 +202,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                             ),
                           ),
                         ),
-
-                        // 2. 건너뛰기 버튼
                         Positioned(
                           top: 17.0,
                           right: 0,
@@ -262,20 +273,27 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                                 }
                               });
                             },
-                            child: Container(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
                               decoration: BoxDecoration(
                                 color: item['color'],
                                 borderRadius: BorderRadius.circular(16),
                                 border: isSelected
                                     ? Border.all(color: primaryGreen, width: 2)
-                                    : null,
+                                    : Border.all(
+                                        color: Colors.transparent,
+                                        width: 2,
+                                      ),
                               ),
                               child: Stack(
                                 children: [
                                   Positioned(
                                     top: 8,
                                     right: 8,
-                                    child: Container(
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
                                       width: 20,
                                       height: 20,
                                       decoration: BoxDecoration(

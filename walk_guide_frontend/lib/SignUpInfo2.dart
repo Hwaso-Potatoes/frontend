@@ -78,8 +78,8 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => SignUpInfo3(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => SignUpInfo3(
           userId: widget.userId,
           nickname: widget.nickname,
           petName: petName,
@@ -87,6 +87,13 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
           birthDate: birthDate,
           profileImage: _profileImagePath,
         ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation.drive(CurveTween(curve: Curves.easeInOut)),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }
@@ -121,7 +128,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         ),
                       ),
                     ),
-
                     Positioned(
                       left: 20.0,
                       child: IconButton(
@@ -140,7 +146,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
               ),
             ),
 
-            // 2. 여백
             const SizedBox(height: 30),
 
             // 3. 본문 영역
@@ -151,17 +156,21 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 진행 바 (2/3 지점)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: const LinearProgressIndicator(
-                            value: 0.66,
-                            backgroundColor: Color(0xFFEAE7DE),
-                            color: Color(0xFF72AA4F),
-                            minHeight: 10,
-                          ),
+                      // 진행 바 (0.33 -> 0.66)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOut,
+                          tween: Tween<double>(begin: 0.33, end: 0.66),
+                          builder: (context, value, child) {
+                            return LinearProgressIndicator(
+                              value: value,
+                              backgroundColor: const Color(0xFFEAE7DE),
+                              color: const Color(0xFF72AA4F),
+                              minHeight: 10,
+                            );
+                          },
                         ),
                       ),
 
@@ -267,7 +276,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
 
                       const SizedBox(height: 16),
 
-                      // 생년월일 (CustomTextField 스타일과 완벽 통일)
+                      // 생년월일
                       const Text(
                         '생년월일',
                         style: TextStyle(

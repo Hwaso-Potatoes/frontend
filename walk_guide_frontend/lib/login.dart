@@ -4,6 +4,7 @@ import 'widgets/custom_widgets.dart';
 import 'services/api_service.dart';
 import 'SignUp.dart';
 import 'ResetPW.dart';
+import 'home.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
@@ -71,10 +72,11 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        await showCustomDialog(
-          context: context,
-          title: '로그인 성공',
-          message: result['message'] ?? '로그인되었습니다.',
+        // 성공 팝업 제거 후 바로 HomeScreen 진입 (권한 팝업 없음)
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
         );
       } else {
         await showCustomDialog(
@@ -171,7 +173,9 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 12),
                     _isLoading
                         ? const Center(
-                            child: CircularProgressIndicator(color: primaryGreen),
+                            child: CircularProgressIndicator(
+                              color: primaryGreen,
+                            ),
                           )
                         : CustomButton(text: '로그인', onPressed: _handleLogin),
                     const SizedBox(height: 13),
