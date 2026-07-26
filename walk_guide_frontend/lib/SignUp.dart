@@ -18,7 +18,7 @@ class _SignUpState extends State<SignUp> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _nicknameController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -26,7 +26,7 @@ class _SignUpState extends State<SignUp> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _phoneController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
@@ -34,16 +34,11 @@ class _SignUpState extends State<SignUp> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  bool _isValidPhone(String phone) {
-    final cleanPhone = phone.replaceAll('-', '');
-    return RegExp(r'^01[016789]\d{7,8}$').hasMatch(cleanPhone);
-  }
-
   Future<void> _handleNextStep() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
-    final phone = _phoneController.text.trim();
+    final nickname = _nicknameController.text.trim();
 
     if (email.isEmpty) {
       showCustomDialog(context: context, title: '안내', message: '이메일을 입력해주세요.');
@@ -91,24 +86,17 @@ class _SignUpState extends State<SignUp> {
       return;
     }
 
-    if (phone.isEmpty) {
-      showCustomDialog(context: context, title: '안내', message: '전화번호를 입력해주세요.');
-      return;
-    }
-
-    if (!_isValidPhone(phone)) {
-      showCustomDialog(
-        context: context,
-        title: '입력 오류',
-        message: '올바른 전화번호 형식이 아닙니다.',
-      );
+    // 닉네임 유효성 검사
+    if (nickname.isEmpty) {
+      showCustomDialog(context: context, title: '안내', message: '닉네임을 입력해주세요.');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await ApiService.signUp(email, password, phone);
+      // ApiService에 phone 대신 nickname 전달
+      final result = await ApiService.signUp(email, password, nickname);
       setState(() => _isLoading = false);
 
       if (!mounted) return;
@@ -116,7 +104,6 @@ class _SignUpState extends State<SignUp> {
       if (result['success'] == true) {
         final String userId = result['user_id']?.toString() ?? '1';
 
-        // 💡 "회원가입 완료" 팝업 없이, 방금 생성된 userId를 들고 즉시 SignUpInfo1 화면으로 이동합니다!
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => SignUpInfo1(userId: userId)),
@@ -221,9 +208,9 @@ class _SignUpState extends State<SignUp> {
                     ),
                     const SizedBox(height: 12),
                     CustomTextField(
-                      controller: _phoneController,
-                      hintText: 'Phone',
-                      keyboardType: TextInputType.phone,
+                      controller: _nicknameController,
+                      hintText: 'Nickname',
+                      keyboardType: TextInputType.text,
                     ),
                     const SizedBox(height: 12),
                     _isLoading
