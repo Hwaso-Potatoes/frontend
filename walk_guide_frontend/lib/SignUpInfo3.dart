@@ -70,6 +70,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
         breed: widget.breed,
         birthDate: widget.birthDate,
         profileImage: widget.profileImage,
+        personalities: _selectedPersonalities.toList(),
       );
 
       setState(() => _isLoading = false);

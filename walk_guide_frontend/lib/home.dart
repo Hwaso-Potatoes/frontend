@@ -12,7 +12,6 @@ const Color primaryGreen = Color(0xFF27722F);
 // -----------------------------------------------------------------------------
 // [DB 스키마 매핑 모델]
 // -----------------------------------------------------------------------------
-
 class PetMissionItem {
   final int id;
   final int missionId;
@@ -45,6 +44,18 @@ class PetMissionItem {
   }
 }
 
+class FriendDogDisplay {
+  final String name;
+  final String? profileImage;
+  final double? distanceMeters; // 💡 내 위치로부터의 거리 (위치 기반 추천용)
+
+  FriendDogDisplay({
+    required this.name,
+    this.profileImage,
+    this.distanceMeters,
+  });
+}
+
 class HomeDashboardResponse {
   final String userName;
   final int petId;
@@ -75,13 +86,6 @@ class HomeDashboardResponse {
   });
 }
 
-class FriendDogDisplay {
-  final String name;
-  final String? profileImage;
-
-  FriendDogDisplay({required this.name, this.profileImage});
-}
-
 // -----------------------------------------------------------------------------
 // [HomeScreen 위젯]
 // -----------------------------------------------------------------------------
@@ -101,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _homeDataFuture = ApiService.getHomeDashboardData();
+    _loadDashboard();
 
     if (widget.showPermissionDialog) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,6 +113,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _showPermissionDialog(context);
       });
     }
+  }
+
+  void _loadDashboard() {
+    _homeDataFuture = ApiService.getHomeDashboardData();
   }
 
   void _showPermissionDialog(BuildContext context) {
@@ -141,10 +149,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                '데이터를 불러오지 못했습니다.\n다시 시도해주세요.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black.withValues(alpha: 0.5)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '데이터를 불러오지 못했습니다.',
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _loadDashboard()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                    ),
+                    child: const Text(
+                      '다시 시도',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -201,10 +226,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   walkPercentage,
                                 ),
                                 const SizedBox(height: 28),
+                                // 💡 위치 기반 주변 산책 친구 섹션
                                 _buildWalkingFriendsSection(
                                   data.walkingFriends,
                                 ),
                                 const SizedBox(height: 28),
+                                // 💡 실시간 미션 목록 섹션
                                 _buildDailyMissionsSection(data.dailyMissions),
                                 const SizedBox(height: 28),
                                 CustomButton(
@@ -256,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 공통 하단 네비게이션 바
+              // 하단 공통 네비게이션 바
               Positioned(
                 left: 0,
                 right: 0,
@@ -278,6 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 상단 히어로 영역
   Widget _buildTopHeroSection(String userName, String? petImageUrl) {
     return SizedBox(
       width: double.infinity,
@@ -580,67 +608,108 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 💡 [개선] 위치 기반 추천 친구 가로 스크롤 리스트 (동적 개수 지원)
   Widget _buildWalkingFriendsSection(List<FriendDogDisplay> friends) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '지금 산책 중인 친구',
-          style: GoogleFonts.notoSansKr(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: friends.map((friend) {
-            return Column(
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE9F0D8),
-                    shape: BoxShape.circle,
-                  ),
-                  child: friend.profileImage != null
-                      ? ClipOval(
-                          child: Image.network(
-                            friend.profileImage!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.pets,
-                                  color: Color(0xFF72AA4F),
-                                  size: 30,
-                                ),
-                          ),
-                        )
-                      : const Icon(
-                          Icons.pets,
-                          color: Color(0xFF72AA4F),
-                          size: 30,
-                        ),
+          children: [
+            Text(
+              '지금 산책 중인 친구',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.black,
+              ),
+            ),
+            if (friends.isNotEmpty)
+              Text(
+                '${friends.length}마리 산책 중',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF72AA4F),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  friend.name,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
+              ),
+          ],
         ),
+        const SizedBox(height: 14),
+        if (friends.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEBEFDA),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Text(
+                '현재 주변에 산책 중인 친구가 없습니다.',
+                style: TextStyle(fontSize: 12, color: Colors.black45),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 94,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: friends.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final friend = friends[index];
+                return Column(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE9F0D8),
+                        shape: BoxShape.circle,
+                      ),
+                      child:
+                          friend.profileImage != null &&
+                              friend.profileImage!.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                friend.profileImage!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(
+                                      Icons.pets,
+                                      color: Color(0xFF72AA4F),
+                                      size: 28,
+                                    ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.pets,
+                              color: Color(0xFF72AA4F),
+                              size: 28,
+                            ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      friend.name,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
       ],
     );
   }
 
+  // 💡 [개선] 실시간 미션 목록 동적 리스트 렌더링
   Widget _buildDailyMissionsSection(List<PetMissionItem> missions) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,7 +726,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                // 팀원의 전체 미션 페이지로 라우팅 시 연결할 핸들러
+              },
               child: const Text(
                 '더보기',
                 style: TextStyle(
@@ -670,41 +741,57 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ...missions.map((mission) {
-          final isCompleted =
-              mission.status == 'CLAIMED' || mission.status == 'CLAIMABLE';
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10.0),
-            child: _buildMissionItem(
-              leading: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? const Color(0xFF90C271)
-                      : const Color(0xFFDDEBC8),
-                  shape: BoxShape.circle,
-                ),
-                child: isCompleted
-                    ? const Icon(Icons.check, color: Colors.white, size: 18)
-                    : Center(
-                        child: Text(
-                          '${mission.requiredCount}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: Color(0xFF496B31),
+        if (missions.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEBEFDA),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Text(
+                '오늘 등록된 미션이 없습니다.',
+                style: TextStyle(fontSize: 13, color: Colors.black45),
+              ),
+            ),
+          )
+        else
+          ...missions.map((mission) {
+            final isCompleted =
+                mission.status == 'CLAIMED' || mission.status == 'CLAIMABLE';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: _buildMissionItem(
+                leading: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? const Color(0xFF90C271)
+                        : const Color(0xFFDDEBC8),
+                    shape: BoxShape.circle,
+                  ),
+                  child: isCompleted
+                      ? const Icon(Icons.check, color: Colors.white, size: 18)
+                      : Center(
+                          child: Text(
+                            '${mission.requiredCount}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF496B31),
+                            ),
                           ),
                         ),
-                      ),
+                ),
+                title: mission.title,
+                subtitle: isCompleted
+                    ? '+ ${mission.rewardExperience} XP'
+                    : '${mission.currentValue} / ${mission.requiredCount} 완료',
               ),
-              title: mission.title,
-              subtitle: isCompleted
-                  ? '+ ${mission.rewardExperience} XP'
-                  : '${mission.currentValue} / ${mission.requiredCount} 완료',
-            ),
-          );
-        }),
+            );
+          }),
       ],
     );
   }

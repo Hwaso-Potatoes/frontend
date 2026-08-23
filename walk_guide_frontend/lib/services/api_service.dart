@@ -2,18 +2,166 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../home.dart';
 
+// -----------------------------------------------------------------------------
+// [1. 산책 시작/종료 응답 모델]
+// -----------------------------------------------------------------------------
+class WalkData {
+  final int id;
+  final int userId;
+  final int? petId;
+  final String status;
+  final bool isLocationShared;
+  final String startTime;
+  final String? endTime;
+  final double totalDistance;
+  final int totalDuration;
+  final int totalPausedSeconds;
+  final String pausedTimeStr;
+  final String totalDurationStr;
+
+  WalkData({
+    required this.id,
+    required this.userId,
+    this.petId,
+    required this.status,
+    required this.isLocationShared,
+    required this.startTime,
+    this.endTime,
+    required this.totalDistance,
+    required this.totalDuration,
+    required this.totalPausedSeconds,
+    required this.pausedTimeStr,
+    required this.totalDurationStr,
+  });
+
+  factory WalkData.fromJson(Map<String, dynamic> json) {
+    return WalkData(
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      userId: json['user'] is int
+          ? json['user']
+          : int.tryParse(json['user']?.toString() ?? '0') ?? 0,
+      petId: json['pet'] is int
+          ? json['pet']
+          : int.tryParse(json['pet']?.toString() ?? ''),
+      status: json['status']?.toString() ?? 'FINISHED',
+      isLocationShared: json['is_location_shared'] ?? false,
+      startTime: json['start_time']?.toString() ?? '',
+      endTime: json['end_time']?.toString(),
+      totalDistance: (json['total_distance'] is num)
+          ? (json['total_distance'] as num).toDouble()
+          : double.tryParse(json['total_distance']?.toString() ?? '0.0') ?? 0.0,
+      totalDuration: json['total_duration'] is int
+          ? json['total_duration']
+          : int.tryParse(json['total_duration']?.toString() ?? '0') ?? 0,
+      totalPausedSeconds: json['total_paused_seconds'] is int
+          ? json['total_paused_seconds']
+          : int.tryParse(json['total_paused_seconds']?.toString() ?? '0') ?? 0,
+      pausedTimeStr: json['paused_time_str']?.toString() ?? '0초',
+      totalDurationStr: json['total_duration_str']?.toString() ?? '0초',
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// [2. 산책 리포트 뱃지 & 종합 데이터 모델]
+// -----------------------------------------------------------------------------
+class BadgeData {
+  final String title;
+  final String description;
+  final String tagLabel;
+
+  BadgeData({
+    required this.title,
+    required this.description,
+    required this.tagLabel,
+  });
+
+  factory BadgeData.fromJson(Map<String, dynamic> json) {
+    return BadgeData(
+      title: json['title']?.toString() ?? '새로운 뱃지 획득!',
+      description: json['description']?.toString() ?? '도감에 새로운 뱃지가 추가되었습니다.',
+      tagLabel: json['tag_label']?.toString() ?? 'Day 1',
+    );
+  }
+}
+
+class WalkReportData {
+  final String petName;
+  final double totalDistance;
+  final String totalDurationStr;
+  final int calories;
+  final int earnedExp;
+  final int expToNextLevel;
+  final double expRatio; // 0.0 ~ 1.0 (경험치 게이지 비율)
+  final BadgeData? newBadge;
+
+  WalkReportData({
+    required this.petName,
+    required this.totalDistance,
+    required this.totalDurationStr,
+    required this.calories,
+    required this.earnedExp,
+    required this.expToNextLevel,
+    required this.expRatio,
+    this.newBadge,
+  });
+
+  factory WalkReportData.fromJson(Map<String, dynamic> json) {
+    final pet = json['pet'] as Map<String, dynamic>? ?? {};
+    final walk = json['walk'] as Map<String, dynamic>? ?? json;
+
+    final double distance = (walk['total_distance'] is num)
+        ? (walk['total_distance'] as num).toDouble()
+        : double.tryParse(walk['total_distance']?.toString() ?? '0.0') ?? 0.0;
+
+    final int expGained = walk['earned_exp'] is int
+        ? walk['earned_exp']
+        : int.tryParse(walk['earned_exp']?.toString() ?? '24') ?? 24;
+
+    final int nextExp = pet['exp_to_next_level'] is int
+        ? pet['exp_to_next_level']
+        : int.tryParse(pet['exp_to_next_level']?.toString() ?? '22') ?? 22;
+
+    final int currentExp = pet['current_exp'] is int
+        ? pet['current_exp']
+        : int.tryParse(pet['current_exp']?.toString() ?? '72') ?? 72;
+
+    final int maxExp = pet['max_exp'] is int
+        ? pet['max_exp']
+        : int.tryParse(pet['max_exp']?.toString() ?? '100') ?? 100;
+
+    final double calculatedRatio = maxExp > 0
+        ? (currentExp / maxExp).clamp(0.0, 1.0)
+        : 0.72;
+
+    return WalkReportData(
+      petName: pet['name']?.toString() ?? json['pet_name']?.toString() ?? '두부',
+      totalDistance: distance,
+      totalDurationStr: walk['total_duration_str']?.toString() ?? '00분 00초',
+      calories: walk['calories'] is int
+          ? walk['calories']
+          : int.tryParse(walk['calories']?.toString() ?? '') ??
+                (distance * 55).toInt().clamp(0, 999),
+      earnedExp: expGained,
+      expToNextLevel: nextExp,
+      expRatio: calculatedRatio,
+      newBadge: json['new_badge'] != null
+          ? BadgeData.fromJson(json['new_badge'])
+          : null,
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// [3. ApiService 메인 클래스]
+// -----------------------------------------------------------------------------
 class ApiService {
-  // 1. 백엔드 팀 서버 도메인 주소로 변경
-  static const String baseUrl =
-      'http://10.0.2.2:8000'; // 예: https://api.yourdomain.com
+  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const bool useMockData = true; // 내일 실서버 연동 시 false로 전환
 
-  // 2. 내일 백엔드 연결 시 false로만 바꾸면 실서버 API와 통신합니다.
-  static const bool useMockData = true;
-
-  // ---------------------------------------------------------------------------
-  // [홈 화면 종합 데이터 로드 API]
-  // GET api/users/:user_id/ + GET api/pets/:pet_id/ + GET api/friends/ + GET api/pets/:pet_id/missions/
-  // ---------------------------------------------------------------------------
+  // [홈 화면 종합 데이터 로드]
   static Future<HomeDashboardResponse> getHomeDashboardData({
     String userId = '1',
     int petId = 1,
@@ -27,7 +175,7 @@ class ApiService {
         petBreed: '말티즈',
         petAge: 2,
         petLevel: 1,
-        petImageUrl: null, // 서버 이미지 URL (null 시 기본 이미지)
+        petImageUrl: null,
         petPersonalities: ['에너지형', '호기심형'],
         targetDistance: 2.0,
         currentDistance: 1.4,
@@ -60,7 +208,6 @@ class ApiService {
       );
     }
 
-    // 실서버 연동 시 실행되는 코드
     try {
       final userRes = await http.get(Uri.parse('$baseUrl/api/users/$userId/'));
       final petRes = await http.get(Uri.parse('$baseUrl/api/pets/$petId/'));
@@ -77,7 +224,7 @@ class ApiService {
       final friendList = (jsonDecode(friendsRes.body) as List)
           .map(
             (f) => FriendDogDisplay(
-              name: f['pet_name'],
+              name: f['pet_name'] ?? '친구',
               profileImage: f['profile_image_url'],
             ),
           )
@@ -104,49 +251,114 @@ class ApiService {
     }
   }
 
-  // [1. 일반 로그인] POST api/users/login/
+  // [산책 시작 API] POST api/walks/start/
+  static Future<WalkData> startWalk({
+    int? petId,
+    bool isLocationShared = true,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return WalkData(
+        id: 3,
+        userId: 1,
+        petId: petId,
+        status: 'WALKING',
+        isLocationShared: isLocationShared,
+        startTime: DateTime.now().toIso8601String(),
+        totalDistance: 0.0,
+        totalDuration: 0,
+        totalPausedSeconds: 0,
+        pausedTimeStr: '0초',
+        totalDurationStr: '0초',
+      );
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/walks/start/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'pet': petId,
+          'is_location_shared': isLocationShared,
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return WalkData.fromJson(body['data']);
+      }
+      throw Exception(body['message'] ?? '산책 시작 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [산책 종료 API] POST api/walks/:walk_id/end/
+  static Future<WalkReportData> endWalk(
+    int walkId, {
+    double? currentDistance,
+    String? currentDurationStr,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      final double distance = currentDistance ?? 1.8;
+      return WalkReportData(
+        petName: '두부',
+        totalDistance: distance,
+        totalDurationStr: currentDurationStr ?? '32분 25초',
+        calories: (distance * 55).toInt().clamp(0, 999),
+        earnedExp: 24,
+        expToNextLevel: 22,
+        expRatio: 0.72,
+        newBadge: BadgeData(
+          title: '새로운 뱃지 획득!',
+          description: "뱃지 '첫 발걸음'이 도감에 추가되었어요.",
+          tagLabel: 'Day 1',
+        ),
+      );
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/walks/$walkId/end/'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return WalkReportData.fromJson(body['data'] ?? body);
+      }
+      throw Exception(body['message'] ?? '산책 종료 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [로그인 / 회원가입 / 프로필 / 비밀번호 API]
   static Future<Map<String, dynamic>> login(
     String email,
     String password,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return {
-        'success': true,
-        'user_id': '1',
-        'access': 'mock_access_token',
-        'refresh': 'mock_refresh_token',
-        'message': '로그인 성공!',
-      };
+      return {'success': true, 'user_id': '1', 'message': '로그인 성공!'};
     }
-
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/login/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
-
       final data = jsonDecode(response.body);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          'success': true,
-          'user_id': data['user_id']?.toString(),
-          'access': data['access'],
-          'refresh': data['refresh'],
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? '이메일 또는 비밀번호를 확인해주세요.',
-        };
-      }
+      return {
+        'success': response.statusCode == 200,
+        'user_id': data['user_id']?.toString(),
+      };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 
-  // [2. 소셜 로그인] POST api/users/socaillogin
   static Future<Map<String, dynamic>> socialLogin(String provider) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -154,47 +366,35 @@ class ApiService {
         'success': true,
         'user_id': '1',
         'is_new_user': false,
-        'access': 'mock_access_token',
-        'refresh': 'mock_refresh_token',
-        'message': '$provider 소셜 로그인 성공!',
+        'message': '$provider 로그인 성공!',
       };
     }
-
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/socaillogin'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'provider': provider}),
       );
-
       final data = jsonDecode(response.body);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          'success': true,
-          'user_id': data['user_id']?.toString(),
-          'is_new_user': data['is_new_user'] ?? false,
-          'access': data['access'],
-          'refresh': data['refresh'],
-        };
-      } else {
-        return {'success': false, 'message': data['message'] ?? '소셜 로그인 실패'};
-      }
+      return {
+        'success': response.statusCode == 200,
+        'user_id': data['user_id']?.toString(),
+        'is_new_user': data['is_new_user'] ?? false,
+      };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 
-  // [3. 회원가입] POST api/users/register/
   static Future<Map<String, dynamic>> signUp(
     String email,
     String password,
-    String phone,
+    String nickname,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'user_id': '1', 'message': '회원가입이 완료되었습니다.'};
+      return {'success': true, 'user_id': '1'};
     }
-
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/register/'),
@@ -202,69 +402,9 @@ class ApiService {
         body: jsonEncode({
           'email': email,
           'password': password,
-          'phone': phone,
+          'nickname': nickname,
         }),
       );
-
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'user_id': data['id']?.toString()};
-      }
-      return {'success': false, 'message': data['message'] ?? '회원가입 실패'};
-    } catch (e) {
-      return {'success': false, 'message': '서버 연결 실패'};
-    }
-  }
-
-  // [4. 유저 프로필 수정] PATCH api/users/:user_id/
-  static Future<Map<String, dynamic>> updateUserProfile(
-    String userId,
-    String nickname,
-  ) async {
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'message': '프로필 업데이트 완료!'};
-    }
-
-    try {
-      final response = await http.patch(
-        Uri.parse('$baseUrl/api/users/$userId/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'nickname': nickname}),
-      );
-
-      return {'success': response.statusCode == 200};
-    } catch (e) {
-      return {'success': false, 'message': '서버 연결 실패'};
-    }
-  }
-
-  // [5. 반려견 등록] POST api/pets/
-  static Future<Map<String, dynamic>> registerPet({
-    required String userId,
-    required String name,
-    required String breed,
-    required String birthDate,
-    String? profileImage,
-  }) async {
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'message': '반려견 등록 완료!'};
-    }
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/pets/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user': userId,
-          'name': name,
-          'breed': breed,
-          'birth_date': birthDate,
-          'profile_image': profileImage,
-        }),
-      );
-
       return {
         'success': response.statusCode == 200 || response.statusCode == 201,
       };
@@ -273,18 +413,59 @@ class ApiService {
     }
   }
 
-  // [6. 비밀번호 재설정] POST api/users/password/reset/
+  static Future<Map<String, dynamic>> updateUserProfile(
+    String userId,
+    String nickname,
+  ) async {
+    if (useMockData) return {'success': true};
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/users/$userId/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'nickname': nickname}),
+      );
+      return {'success': res.statusCode == 200};
+    } catch (e) {
+      return {'success': false};
+    }
+  }
+
+  // 💡 personalities 파라미터가 추가된 반려견 등록 함수
+  static Future<Map<String, dynamic>> registerPet({
+    required String userId,
+    required String name,
+    required String breed,
+    required String birthDate,
+    String? profileImage,
+    List<String>? personalities,
+  }) async {
+    if (useMockData) return {'success': true};
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/pets/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user': userId,
+          'name': name,
+          'breed': breed,
+          'birth_date': birthDate,
+          'profile_image': profileImage,
+          'personalities': personalities ?? [],
+        }),
+      );
+      return {'success': res.statusCode == 200 || res.statusCode == 201};
+    } catch (e) {
+      return {'success': false};
+    }
+  }
+
   static Future<Map<String, dynamic>> resetPassword(
     String currentPassword,
     String newPassword,
   ) async {
-    if (useMockData) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'message': '비밀번호가 성공적으로 변경되었습니다.'};
-    }
-
+    if (useMockData) return {'success': true};
     try {
-      final response = await http.post(
+      final res = await http.post(
         Uri.parse('$baseUrl/api/users/password/reset/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -292,10 +473,9 @@ class ApiService {
           'new_password': newPassword,
         }),
       );
-
-      return {'success': response.statusCode == 200};
+      return {'success': res.statusCode == 200};
     } catch (e) {
-      return {'success': false, 'message': '서버 연결 실패'};
+      return {'success': false};
     }
   }
 }

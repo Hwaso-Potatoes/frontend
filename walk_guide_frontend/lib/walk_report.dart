@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/custom_widgets.dart';
+import 'services/api_service.dart';
 
 class WalkReportScreen extends StatelessWidget {
-  const WalkReportScreen({super.key});
+  final WalkReportData reportData;
+
+  const WalkReportScreen({super.key, required this.reportData});
 
   @override
   Widget build(BuildContext context) {
+    final String distanceStr =
+        '${reportData.totalDistance.toStringAsFixed(1)}km';
+    final String durationStr = _formatDuration(reportData.totalDurationStr);
+    final String caloriesStr = '${reportData.calories}kcal';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9E5),
       body: SafeArea(
@@ -16,6 +24,8 @@ class WalkReportScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 20),
+
+              // 1. 완료 체크 아이콘
               Container(
                 width: 110,
                 height: 110,
@@ -30,6 +40,8 @@ class WalkReportScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // 2. 타이틀 & 서브타이틀
               Text(
                 '오늘 산책 완료!',
                 style: GoogleFonts.notoSansKr(
@@ -39,25 +51,29 @@ class WalkReportScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                '두부와 함께한 32분',
-                style: TextStyle(
+              Text(
+                '${reportData.petName}와 함께한 $durationStr',
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF7A7955),
                 ),
               ),
               const SizedBox(height: 28),
+
+              // 3. 3개 통계 카드 (거리, 시간, 칼로리)
               Row(
                 children: [
-                  Expanded(child: _buildStatCard('1.8km', '이동 거리')),
+                  Expanded(child: _buildStatCard(distanceStr, '이동 거리')),
                   const SizedBox(width: 10),
-                  Expanded(child: _buildStatCard('32분', '산책 시간')),
+                  Expanded(child: _buildStatCard(durationStr, '산책 시간')),
                   const SizedBox(width: 10),
-                  Expanded(child: _buildStatCard('98kcal', '소모 칼로리')),
+                  Expanded(child: _buildStatCard(caloriesStr, '소모 칼로리')),
                 ],
               ),
               const SizedBox(height: 18),
+
+              // 4. 진화 경험치 바 (비율 비례 렌더링)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -70,8 +86,8 @@ class WalkReportScreen extends StatelessWidget {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
+                      children: [
+                        const Text(
                           '진화 경험치',
                           style: TextStyle(
                             fontSize: 14,
@@ -80,8 +96,8 @@ class WalkReportScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '+24 XP',
-                          style: TextStyle(
+                          '+${reportData.earnedExp} XP',
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Colors.white70,
@@ -92,88 +108,105 @@ class WalkReportScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: const LinearProgressIndicator(
-                        value: 0.72,
+                      child: LinearProgressIndicator(
+                        value: reportData.expRatio,
                         minHeight: 10,
                         backgroundColor: Colors.white24,
-                        valueColor: AlwaysStoppedAnimation<Color>(
+                        valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFF88C15A),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      '다음 진화까지 22 XP 남았어요',
-                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                    Text(
+                      '다음 진화까지 ${reportData.expToNextLevel} XP 남았어요',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEBEFDA),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFFC7D3B0),
-                    width: 1.2,
+
+              // 5. 새로운 뱃지 획득 카드 (뱃지 데이터가 있을 때만 동적 렌더링)
+              if (reportData.newBadge != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: const Color(0xFF75A64C),
-                          width: 1.5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBEFDA),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFFC7D3B0),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFF75A64C),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.pets,
+                              size: 16,
+                              color: Color(0xFF75A64C),
+                            ),
+                            Text(
+                              reportData.newBadge!.tagLabel,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF75A64C),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.pets, size: 16, color: Color(0xFF75A64C)),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Day 1',
-                            style: TextStyle(
-                              fontSize: 8,
+                            reportData.newBadge!.title,
+                            style: const TextStyle(
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF75A64C),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            reportData.newBadge!.description,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black54,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          '새로운 뱃지 획득!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          '뱃지 \'첫 발걸음\'이 도감에 추가되었어요.',
-                          style: TextStyle(fontSize: 11, color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 32),
+              ] else
+                const SizedBox(height: 16),
+
+              // 6. 하단 버튼
               Row(
                 children: [
                   Expanded(
@@ -192,7 +225,6 @@ class WalkReportScreen extends StatelessWidget {
                       backgroundColor: const Color(0xFF3F6634),
                       textColor: Colors.white,
                       onPressed: () {
-                        // 확인 누르면 홈으로 이동
                         Navigator.popUntil(context, (route) => route.isFirst);
                       },
                     ),
@@ -205,6 +237,17 @@ class WalkReportScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDuration(String durationStr) {
+    if (durationStr.isEmpty || durationStr == '0초') return '00분 00초';
+    final minMatch = RegExp(r'(\d+)분').firstMatch(durationStr);
+    final secMatch = RegExp(r'(\d+)초').firstMatch(durationStr);
+
+    final String min = (minMatch?.group(1) ?? '0').padLeft(2, '0');
+    final String sec = (secMatch?.group(1) ?? '0').padLeft(2, '0');
+
+    return '$min분 $sec초';
   }
 
   Widget _buildStatCard(String value, String label) {
