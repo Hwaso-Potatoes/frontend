@@ -50,8 +50,18 @@ class CustomTextField extends StatelessWidget {
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
+  final Color backgroundColor;
+  final Color textColor;
+  final Color? borderColor;
 
-  const CustomButton({super.key, required this.text, required this.onPressed});
+  const CustomButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+    this.backgroundColor = primaryGreen,
+    this.textColor = Colors.white,
+    this.borderColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +70,9 @@ class CustomButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(15.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.23), // 진하기
-            blurRadius: 3, // 퍼짐 정도
-            offset: const Offset(3, 5.5), // 내려온 위치
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 4,
+            offset: const Offset(2, 4),
           ),
         ],
       ),
@@ -72,18 +82,21 @@ class CustomButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: primaryGreen,
+            backgroundColor: backgroundColor,
             elevation: 0,
+            side: borderColor != null
+                ? BorderSide(color: borderColor!, width: 1.2)
+                : null,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15.0),
             ),
           ),
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: textColor,
             ),
           ),
         ),
@@ -92,7 +105,7 @@ class CustomButton extends StatelessWidget {
   }
 }
 
-// CustomDialog (Future<void> 반환으로 수정)
+// CustomDialog
 Future<void> showCustomDialog({
   required BuildContext context,
   required String title,
@@ -132,4 +145,127 @@ Future<void> showCustomDialog({
       );
     },
   );
+}
+
+// 공통 하단 네비게이션 바 위젯
+class CustomBottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const CustomBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isWalkSelected = currentIndex == 2;
+    return SizedBox(
+      height: 94,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // 1. 하단 바 본체
+          Container(
+            height: 72,
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildNavItem(0, Icons.home_outlined, '홈'),
+                _buildNavItem(1, Icons.insert_photo_outlined, '리포트'),
+                const SizedBox(width: 68), // 중앙 산책 버튼 자리
+                _buildNavItem(3, Icons.people_outline, '친구'),
+                _buildNavItem(4, Icons.person_outline, '프로필'),
+              ],
+            ),
+          ),
+
+          // 2. 중앙 돌출형 산책 탭
+          Positioned(
+            top: -7,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(2),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 79,
+                    height: 79,
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFADC87F),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.pets,
+                        color: Colors.white,
+                        size: 38,
+                      ),
+                    ),
+                  ),
+                  Transform.translate(
+                    offset: const Offset(0, -4),
+                    child: Text(
+                      '산책',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isWalkSelected
+                            ? FontWeight.w900
+                            : FontWeight.w600,
+                        color: isWalkSelected
+                            ? Colors.black
+                            : const Color(0xFF707070),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = currentIndex == index;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onTap(index),
+      child: SizedBox(
+        width: 60,
+        height: 72,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(icon, color: const Color(0xFFADC87F), size: 34),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                color: isSelected ? Colors.black : const Color(0xFF707070),
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 9),
+          ],
+        ),
+      ),
+    );
+  }
 }

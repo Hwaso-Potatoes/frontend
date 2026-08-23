@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/custom_widgets.dart';
 import 'services/api_service.dart';
+import 'walk_tracking.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -100,7 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // 💡 ApiService에서 데이터 일원화하여 로드
     _homeDataFuture = ApiService.getHomeDashboardData();
 
     if (widget.showPermissionDialog) {
@@ -116,6 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => const PermissionDialog(),
+    );
+  }
+
+  void _navigateToWalkTracking() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const WalkTrackingScreen()),
     );
   }
 
@@ -181,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               left: 24,
                               right: 24,
                               top: 24,
-                              bottom: 140, // 💡 시트 스크롤 하단 색상 끊김 완전 방지
+                              bottom: 140,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,7 +207,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 28),
                                 _buildDailyMissionsSection(data.dailyMissions),
                                 const SizedBox(height: 28),
-                                CustomButton(text: '산책 시작하기', onPressed: () {}),
+                                CustomButton(
+                                  text: '산책 시작하기',
+                                  onPressed: _navigateToWalkTracking,
+                                ),
                               ],
                             ),
                           ),
@@ -208,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
 
-                    // 💡 피그마 시안 완벽 일치 나무 & 그림자
                     Positioned(
                       top: 270,
                       right: 20,
@@ -247,12 +256,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 하단 고정 네비게이션 바
+              // 공통 하단 네비게이션 바
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _buildBottomNavigationBar(),
+                child: CustomBottomNavBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    setState(() => _currentIndex = index);
+                    if (index == 2) {
+                      _navigateToWalkTracking();
+                    }
+                  },
+                ),
               ),
             ],
           );
@@ -261,7 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 상단 히어로 영역 (인사말 밀착 레이아웃)
   Widget _buildTopHeroSection(String userName, String? petImageUrl) {
     return SizedBox(
       width: double.infinity,
@@ -732,116 +748,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  // 💡 [피그마 시안 완벽 일치 하단 탭바]
-  Widget _buildBottomNavigationBar() {
-    final isWalkSelected = _currentIndex == 2;
-    return SizedBox(
-      height: 94,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            height: 72,
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildBottomNavItem(0, Icons.home_outlined, '홈'),
-                _buildBottomNavItem(1, Icons.insert_photo_outlined, '리포트'),
-                const SizedBox(width: 68),
-                _buildBottomNavItem(3, Icons.people_outline, '친구'),
-                _buildBottomNavItem(4, Icons.person_outline, '프로필'),
-              ],
-            ),
-          ),
-
-          // 중앙 산책 탭 (원형 돔 + 글씨 가림 방지)
-          Positioned(
-            top: 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _currentIndex = 2),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 78,
-                    height: 78,
-                    padding: const EdgeInsets.all(7),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFADC87F),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.pets,
-                        color: Colors.white,
-                        size: 38,
-                      ),
-                    ),
-                  ),
-                  Transform.translate(
-                    offset: const Offset(0, -18),
-                    child: Text(
-                      '산책',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isWalkSelected
-                            ? FontWeight.w900
-                            : FontWeight.w600,
-                        color: isWalkSelected
-                            ? Colors.black
-                            : const Color(0xFF707070),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavItem(int index, IconData icon, String label) {
-    final isSelected = _currentIndex == index;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _currentIndex = index),
-      child: SizedBox(
-        width: 60,
-        height: 72,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Icon(icon, color: const Color(0xFFADC87F), size: 34),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                color: isSelected ? Colors.black : const Color(0xFF707070),
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 9),
-          ],
-        ),
       ),
     );
   }
