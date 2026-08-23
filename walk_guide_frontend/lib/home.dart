@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'widgets/custom_widgets.dart';
+import 'services/api_service.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
 
 // -----------------------------------------------------------------------------
-// [백엔드 API 및 DB 스키마 매핑 모델]
+// [DB 스키마 매핑 모델]
 // -----------------------------------------------------------------------------
 
 class PetMissionItem {
@@ -99,7 +100,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _homeDataFuture = _fetchHomeData();
+    // 💡 ApiService에서 데이터 일원화하여 로드
+    _homeDataFuture = ApiService.getHomeDashboardData();
 
     if (widget.showPermissionDialog) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,49 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _showPermissionDialog(context);
       });
     }
-  }
-
-  Future<HomeDashboardResponse> _fetchHomeData() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    return HomeDashboardResponse(
-      userName: '예은님',
-      petId: 1,
-      petName: '두부',
-      petBreed: '말티즈',
-      petAge: 2,
-      petLevel: 1,
-      petImageUrl: null,
-      petPersonalities: ['에너지형', '호기심형'],
-      targetDistance: 2.0,
-      currentDistance: 1.4,
-      walkingFriends: [
-        FriendDogDisplay(name: '초코'),
-        FriendDogDisplay(name: '밀크'),
-        FriendDogDisplay(name: '토리'),
-        FriendDogDisplay(name: '휴지'),
-      ],
-      dailyMissions: [
-        PetMissionItem(
-          id: 101,
-          missionId: 1,
-          title: '첫 산책 시작하기',
-          currentValue: 1,
-          requiredCount: 1,
-          rewardExperience: 10,
-          status: 'CLAIMED',
-        ),
-        PetMissionItem(
-          id: 102,
-          missionId: 2,
-          title: '새로운 친구 반려견 만나기',
-          currentValue: 0,
-          requiredCount: 2,
-          rewardExperience: 20,
-          status: 'IN_PROGRESS',
-        ),
-      ],
-    );
   }
 
   void _showPermissionDialog(BuildContext context) {
@@ -222,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               left: 24,
                               right: 24,
                               top: 24,
-                              bottom: 140,
+                              bottom: 140, // 💡 시트 스크롤 하단 색상 끊김 완전 방지
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
 
-                    // 나무 이미지
+                    // 💡 피그마 시안 완벽 일치 나무 & 그림자
                     Positioned(
                       top: 270,
                       right: 20,
@@ -288,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // 하단 탭바
+              // 하단 고정 네비게이션 바
               Positioned(
                 left: 0,
                 right: 0,
@@ -302,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 상단 히어로 영역 (인사말 밀착 레이아웃)
   Widget _buildTopHeroSection(String userName, String? petImageUrl) {
     return SizedBox(
       width: double.infinity,
@@ -458,7 +418,6 @@ class _HomeScreenState extends State<HomeScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
             Text(
               data.petName,
               style: GoogleFonts.notoSansKr(
@@ -467,12 +426,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.black,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               '${data.petBreed} · ${data.petAge}세',
               style: const TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: Colors.black45,
               ),
             ),
@@ -481,7 +440,6 @@ class _HomeScreenState extends State<HomeScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(height: 2),
             Text(
               'Lv.${data.petLevel}',
               style: const TextStyle(
@@ -490,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.black,
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 6),
             Row(
               children: data.petPersonalities.map((trait) {
                 return Padding(
@@ -778,7 +736,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 💡 [수정] 중앙 산책 탭의 글씨가 돔 위 최상단 레이어로 올라오도록 Stack 구조 수정
+  // 💡 [피그마 시안 완벽 일치 하단 탭바]
   Widget _buildBottomNavigationBar() {
     final isWalkSelected = _currentIndex == 2;
     return SizedBox(
@@ -787,7 +745,6 @@ class _HomeScreenState extends State<HomeScreen> {
         alignment: Alignment.bottomCenter,
         clipBehavior: Clip.none,
         children: [
-          // 1. 하단 바 본체
           Container(
             height: 72,
             width: double.infinity,
@@ -799,14 +756,14 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildBottomNavItem(0, Icons.home_outlined, '홈'),
                 _buildBottomNavItem(1, Icons.insert_photo_outlined, '리포트'),
-                const SizedBox(width: 68), // 중앙 산책 버튼 자리
+                const SizedBox(width: 68),
                 _buildBottomNavItem(3, Icons.people_outline, '친구'),
                 _buildBottomNavItem(4, Icons.person_outline, '프로필'),
               ],
             ),
           ),
 
-          // 2. 중앙 돌출형 산책 탭 (원형 버튼 + '산책' 텍스트를 한 컴포넌트로 결합)
+          // 중앙 산책 탭 (원형 돔 + 글씨 가림 방지)
           Positioned(
             top: 2,
             child: GestureDetector(
@@ -815,10 +772,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 원형 돔 + 테두리
                   Container(
-                    width: 75,
-                    height: 70,
+                    width: 78,
+                    height: 78,
                     padding: const EdgeInsets.all(7),
                     decoration: const BoxDecoration(
                       color: Colors.white,
@@ -836,9 +792,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-
                   Transform.translate(
-                    offset: const Offset(0, -3.5),
+                    offset: const Offset(0, -18),
                     child: Text(
                       '산책',
                       style: TextStyle(
@@ -862,7 +817,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 일반 탭 아이템
   Widget _buildBottomNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
