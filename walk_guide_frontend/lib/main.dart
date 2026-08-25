@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'Login.dart';
+import 'screens/profile_screen.dart';
+import 'screens/mission_screen.dart';
+import 'screens/report_screen.dart';
+import 'screens/decorate_screen.dart';
+import 'screens/accessory_box_screen.dart';
+import 'models/accessory_box_model.dart';
 
 void main() {
   runApp(const WalkGuideApp());
@@ -15,7 +21,7 @@ class WalkGuideApp extends StatelessWidget {
       title: 'Walk Guide',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primaryColor: const Color(0xFF27722F)),
-      home: const LoginPage(), // 앱이 시작되면 띄울 첫 화면
+      home: AccessoryBoxScreen(boxData: dummyBoxData), // 앱이 시작되면 띄울 첫 화면 LoginPage()으로 바꿔야해!!!
     );
   }
 }

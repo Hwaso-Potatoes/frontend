@@ -61,6 +61,21 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/dogs/
+    - assets/decoration/
+    - assets/box/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter_18pt-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter_18pt-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter_18pt-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter_18pt-Bold.ttf
+          weight: 700
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
