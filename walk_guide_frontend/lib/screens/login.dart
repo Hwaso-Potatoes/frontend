@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'widgets/custom_widgets.dart';
-import 'services/api_service.dart';
+import '../widgets/custom_widgets.dart';
+import '../services/api_service.dart';
 import 'SignUp.dart';
+import 'SignUpInfo1.dart';
 import 'ResetPW.dart';
-import 'home.dart';
+import 'main_shell.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
@@ -31,6 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
+  // 1. 일반 이메일 로그인 처리
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -72,10 +74,10 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        // 성공 팝업 제거 후 바로 HomeScreen 진입 (권한 팝업 없음)
+        // 로그인 성공 시 MainShellScreen으로 진입
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainShellScreen()),
           (route) => false,
         );
       } else {
@@ -92,6 +94,54 @@ class _LoginPageState extends State<LoginPage> {
         context: context,
         title: '오류',
         message: '서버와의 통신 중 오류가 발생했습니다.',
+      );
+    }
+  }
+
+  // 2. 소셜 로그인 처리 (POST api/users/socaillogin)
+  Future<void> _handleSocialLogin(String provider) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ApiService.socialLogin(provider);
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final bool isNewUser = result['is_new_user'] ?? false;
+        final String userId = result['user_id']?.toString() ?? '';
+
+        if (isNewUser) {
+          // 신규 가입 유저 -> 프로필/반려견 등록 화면으로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SignUpInfo1(userId: userId),
+            ),
+          );
+        } else {
+          // 기존 유저 -> 메인 쉘 홈으로 이동
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainShellScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        showCustomDialog(
+          context: context,
+          title: '소셜 로그인 실패',
+          message: result['message'] ?? '$provider 로그인에 실패했습니다.',
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+      showCustomDialog(
+        context: context,
+        title: '오류',
+        message: '소셜 로그인 통신 중 오류가 발생했습니다.',
       );
     }
   }
@@ -247,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => _handleSocialLogin('GOOGLE'),
                           child: Image.asset(
                             'assets/images/google.png',
                             width: 46,
@@ -256,7 +306,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(width: 20),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => _handleSocialLogin('APPLE'),
                           child: Image.asset(
                             'assets/images/apple.png',
                             width: 46,
@@ -265,7 +315,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(width: 20),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => _handleSocialLogin('KAKAO'),
                           child: Image.asset(
                             'assets/images/kakao.png',
                             width: 46,

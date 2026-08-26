@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'widgets/custom_widgets.dart';
+import '../widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'SignUpInfo2.dart';
 import 'package:flutter_svg/flutter_svg.dart';

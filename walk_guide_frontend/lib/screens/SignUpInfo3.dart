@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'services/api_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'home.dart';
+import '../widgets/custom_widgets.dart';
+import '../services/api_service.dart';
+import 'main_shell.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -70,6 +70,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
         breed: widget.breed,
         birthDate: widget.birthDate,
         profileImage: widget.profileImage,
+        personalities: _selectedPersonalities.toList(),
       );
 
       setState(() => _isLoading = false);
@@ -77,12 +78,12 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
       if (!mounted) return;
 
       if (userRes['success'] == true && petRes['success'] == true) {
-        // 성공 후 HomeScreen 전환도 순수 Fade 적용
+        // 성공 시 메인쉘(권한 팝업 옵션 활성화)로 전환
         Navigator.pushAndRemoveUntil(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const HomeScreen(showPermissionDialog: true),
+                const MainShellScreen(showPermissionDialog: true),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
                   return FadeTransition(
@@ -120,7 +121,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. 커스텀 상단바
+            // 상단 네비게이션 헤더
             Padding(
               padding: const EdgeInsets.only(top: 79.0),
               child: SizedBox(
@@ -159,14 +160,13 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
 
             const SizedBox(height: 30),
 
-            // 3. 본문 영역
+            // 본문 영역
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 진행 바 (0.66 -> 1.0)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: TweenAnimationBuilder<double>(

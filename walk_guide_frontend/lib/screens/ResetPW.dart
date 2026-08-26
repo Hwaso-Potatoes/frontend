@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'widgets/custom_widgets.dart';
-import 'services/api_service.dart';
+import '../widgets/custom_widgets.dart';
+import '../services/api_service.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
