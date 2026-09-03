@@ -62,6 +62,20 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
     }
   }
 
+  /// "홈으로" 버튼 처리.
+  /// 전제: 이 화면은 항상 홈 탭(MainShellScreen의 index 0) 안에서
+  /// 홈 → 미션 → 박스 열기 순서로만 push 되어 들어옴.
+  /// 즉 이 화면이 속한 Navigator의 첫 화면(route.isFirst)이 곧 HomeScreen이라서,
+  /// popUntil로 첫 화면까지 되돌리면 결과적으로 홈 화면으로 가게 됨.
+  ///
+  /// TODO: 만약 나중에 미션/박스 화면이 홈 탭이 아닌 다른 탭(예: 프로필)에서도
+  /// 진입 가능해지면, 이 방식은 "그 탭의 첫 화면"으로 가버려서 홈이 아닐 수 있음.
+  /// 그때는 MainShellScreen 쪽에 "홈 탭으로 강제 전환 + 리셋"하는 공용 함수를
+  /// 만들어서 여기서 호출하도록 바꿔야 함.
+  void _goHome() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,7 +96,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
                       fontSize: 40,
                       height: 1.1,
                       color: Colors.black,
@@ -94,7 +108,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontSize: 13,
                       height: 1.0,
                       color: const Color(0xFF636037).withOpacity(0.75),
@@ -108,7 +122,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                       widget.boxData.rarity.label,
                       style: const TextStyle(
                         fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                         fontSize: 32,
                         height: 1.1,
                         color: Colors.black,
@@ -175,7 +189,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                       '${kBoxRequiredTaps - _tapCount}번 더 터치하면 열려요',
                       style: TextStyle(
                         fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                         fontSize: 13,
                         color: const Color(0xFF636037).withOpacity(0.75),
                       ),
@@ -289,7 +303,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                                   widget.boxData.result.name,
                                   style: const TextStyle(
                                     fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 15,
                                     height: 1.1,
                                     color: Colors.black,
@@ -300,7 +314,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                                   '새 헤어 핀 획득', // TODO: category별 문구 일반화 필요
                                   style: TextStyle(
                                     fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 10,
                                     color: const Color(0xFF636037)
                                         .withOpacity(0.65),
@@ -314,8 +328,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                     ),
                     const SizedBox(height: 40),
                     GestureDetector(
-                      onTap: () =>
-                          Navigator.of(context).popUntil((r) => r.isFirst),
+                      onTap: _goHome,
                       child: Container(
                         width: double.infinity,
                         height: 49,
@@ -337,7 +350,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                           '홈으로',
                           style: TextStyle(
                             fontFamily: 'Inter',
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w800,
                             fontSize: 15,
                             color: Colors.white,
                           ),

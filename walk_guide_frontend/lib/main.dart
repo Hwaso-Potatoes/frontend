@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login.dart';
+import 'screens/main_shell.dart';
 // 💡 언니 개발/테스트용 스크린 import 목록 (필요시 주석 해제)
 // import 'screens/profile_screen.dart';
 // import 'screens/mission_screen.dart';
@@ -7,6 +8,7 @@ import 'screens/login.dart';
 // import 'screens/decorate_screen.dart';
 // import 'screens/accessory_box_screen.dart';
 // import 'models/accessory_box_model.dart';
+import 'screens/home.dart';
 
 void main() {
   runApp(const WalkGuideApp());
@@ -26,10 +28,10 @@ class WalkGuideApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9E5),
       ),
       // 1. 기본 정상 진입 화면 (로그인 화면)
-      home: const LoginPage(),
+      //home: const LoginPage(),
 
       // 2. 언니가 단독 화면 테스트할 때 아래처럼 home을 교체해서 사용 가능:
-      // home: AccessoryBoxScreen(boxData: dummyBoxData),
+      home: const MainShellScreen(),
     );
   }
 }

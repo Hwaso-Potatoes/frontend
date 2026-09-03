@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'walk_tracking.dart';
+import 'mission_screen.dart'; // ✅ "더보기" -> 미션 화면 연결용
+import 'decorate_screen.dart'; // ✅ "꾸미러가기" -> 꾸미기 화면 연결용 (클래스명: DecorationScreen)
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -52,6 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const WalkTrackingScreen()),
+    );
+  }
+
+  // ✅ 오늘의 미션 "더보기" -> 미션 화면
+  void _navigateToMissionScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MissionScreen()),
+    );
+  }
+
+  // ✅ "꾸미러가기" -> 꾸미기 화면
+  void _navigateToDecorationScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const DecorationScreen()),
     );
   }
 
@@ -339,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                   GestureDetector(
-                    onTap: () {},
+                    onTap: _navigateToDecorationScreen, // ✅ 연결됨
 
                     child: Padding(
                       padding: const EdgeInsets.only(top: 50.0),
@@ -427,6 +445,8 @@ class _HomeScreenState extends State<HomeScreen> {
       '퍼그': 'pug.png',
       '사모예드': 'samoyed.png',
       '슈나우저': 'schnauzer.png',
+      // ⚠️ 아래 4개는 견종이 아니라 더미 "친구" 이름을 임시로 땜빵한 것.
+      // TODO: 친구 더미데이터에 실제 breed 필드 생기면 이 4줄 삭제
       '초코': 'poodle.png',
       '밀크': 'samoyed.png',
       '토리': 'corgi.png',
@@ -724,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: _navigateToMissionScreen, // ✅ 연결됨
               child: const Text(
                 '더보기',
                 style: TextStyle(

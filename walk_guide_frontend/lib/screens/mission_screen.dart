@@ -2,7 +2,9 @@
 
 import 'package:flutter/material.dart';
 import '../models/mission_model.dart';
+import '../models/accessory_box_model.dart';
 import '../widgets/mission_card.dart';
+import 'accessory_box_screen.dart';
 
 // 배경색 (다른 화면들과 통일)
 const Color backgroundColor = Color(0xFFF8F9E5);
@@ -21,6 +23,21 @@ class MissionScreen extends StatefulWidget {
 class _MissionScreenState extends State<MissionScreen> {
   MissionTab _selectedTab = MissionTab.daily;
 
+  /// 박스 열기 버튼을 눌렀을 때 호출.
+  /// TODO(backend): mockClaimMissionReward()를 실제 "미션 보상 수령" API 호출로 교체할 것.
+  /// (엔드포인트 URL/HTTP method 확정되면 여기서 mission.id 등을 실어서 요청 보내야 함)
+  Future<void> _handleBoxOpenPressed() async {
+    final boxData = await mockClaimMissionReward();
+
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AccessoryBoxScreen(boxData: boxData),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 지금은 더미 데이터, 나중에 서버 연결되면 API 응답으로 교체
@@ -37,7 +54,7 @@ class _MissionScreenState extends State<MissionScreen> {
             children: [
               const SizedBox(height: 16),
 
-              // ── 뒤로가기 + "미션" 타이틀 (한 줄) ──
+              // ── 뒤로가기 + "미션" 타이틀 (내 친구 화면과 스타일 통일) ──
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -45,7 +62,7 @@ class _MissionScreenState extends State<MissionScreen> {
                     onTap: () => Navigator.of(context).maybePop(),
                     child: const Icon(
                       Icons.arrow_back_ios_new,
-                      size: 32,
+                      size: 24,
                       color: Color(0xFF636037),
                     ),
                   ),
@@ -85,9 +102,7 @@ class _MissionScreenState extends State<MissionScreen> {
                     final mission = missions[index];
                     return MissionCard(
                       mission: mission,
-                      onBoxOpenPressed: () {
-                        // TODO: 액세서리 박스 열기 화면/모달 연결 예정
-                      },
+                      onBoxOpenPressed: _handleBoxOpenPressed,
                     );
                   },
                 ),
@@ -118,7 +133,7 @@ class _MissionScreenState extends State<MissionScreen> {
           label,
           style: TextStyle(
             fontFamily: 'Inter',
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w800,
             fontSize: 15,
             color: isSelected
                 ? const Color(0xFFF8F9E5)

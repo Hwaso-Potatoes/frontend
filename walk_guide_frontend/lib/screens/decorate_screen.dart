@@ -1,4 +1,4 @@
-// lib/screens/decoration_screen.dart
+// lib/screens/decorate_screen.dart
 
 import 'package:flutter/material.dart';
 import '../models/dog_model.dart';
@@ -61,31 +61,36 @@ class _DecorationScreenState extends State<DecorationScreen> {
         bottom: false,
         child: Column(
           children: [
-            // ── 뒤로가기 + "OO 꾸미기" 타이틀 ──
+            // ── 뒤로가기 + "OO 꾸미기" 타이틀 (내 친구 화면과 스타일 통일) ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new,
-                      size: 32,
-                      color: Color(0xFF636037),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${dog.name} 꾸미기',
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 30,
-                      height: 1.1,
-                      color: Colors.black,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 24,
+                          color: Color(0xFF636037),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${dog.name} 꾸미기',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 30,
+                          height: 1.1,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

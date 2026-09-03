@@ -1,9 +1,11 @@
 // lib/screens/profile/profile_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart'; // ✅ 추가: 홈 화면과 같은 폰트 쓰려고
 import '../models/dog_model.dart';       // DogModel, dummyDog 가져오기
 import '../widgets/icons/dog_icon.dart';       // DogIcon 위젯 가져오기
-//import '../badge_book_screen.dart';
+import 'badge_book_screen.dart'; // ✅ 활성화: BadgeBookScreen 연결용
+import 'settings_screen.dart'; // ✅ 연결: 더보기 -> 설정 화면
 import '../widgets/personality_tag.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/exp_bar.dart';
@@ -41,21 +43,32 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // ── 상단: "프로필" 타이틀 + 점 세개(더보기) 버튼 ──
+              // NOTE: 제목 스타일만 내 친구 화면과 통일(Inter, w600, size30).
+              // 화면의 나머지 텍스트는 기존처럼 GoogleFonts.notoSansKr을 계속 씀 -
+              // 제목만 폰트가 달라지는 점 참고. 화면 전체를 Inter로 통일하고
+              // 싶으면 별도로 요청해줄 것.
                 Row( //가로배치. 프로필 텍스트와 더보기 버튼을 한 줄에.
                   mainAxisAlignment: MainAxisAlignment.spaceBetween, //spaceBetween = 양 끝으로 밀어냄. (왼쪽엔 텍스트, 오른쪽엔 버튼)
                   children: [
                     const Text(
                     '프로필', 
                     style: TextStyle(
-                      fontFamily: 'inter',
-                      fontSize: 30,
+                      fontFamily: 'Inter',
                       fontWeight: FontWeight.w600,
+                      fontSize: 30,
                       height: 1.1, //행간 110%
+                      color: Colors.black,
                       ),
                     ),
                     IconButton(
                       onPressed: () {
-                      // TODO: 더보기 메뉴 (설정으로 이동 등) 연결 예정
+                      // ✅ 연결됨: 설정 화면으로 이동
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
                     },
                       icon: const Icon(Icons.more_horiz, color: Color(0xFF636037), size: 28, ),
                   ),
@@ -106,11 +119,11 @@ class ProfileScreen extends StatelessWidget {
               Center(
                 child: Text(
                   dog.name,
-                  style: const TextStyle(
-                    fontFamily: 'inter',
+                  style: GoogleFonts.notoSansKr(
                     fontSize: 24,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     height: 1.1,
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -121,11 +134,11 @@ class ProfileScreen extends StatelessWidget {
               Center(
                 child: Text(
                   '${dog.breed} . ${dog.age}세 . Lv.${dog.level}',
-                  style: const TextStyle(
+                  style: GoogleFonts.notoSansKr(
                     fontSize: 13,
-                    fontFamily: 'Inter',
                     fontWeight: FontWeight.w500,
                     height: 1.0,
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -152,12 +165,13 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 27),
 
               // ── "이번 달 권장 산책 달성률" 섹션 ──
-              const Text(
+              Text(
                 '이번 달 권장 산책 달성률',
-                style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                   height: 1.1,
+                  color: Colors.black,
                   ),
               ),
               const SizedBox(height: 13),
@@ -187,17 +201,24 @@ class ProfileScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     '보유 뱃지',
-                    style: TextStyle(fontSize: 20,
-                     fontWeight: FontWeight.w600,
-                     fontFamily: 'Inter',
+                    style: GoogleFonts.notoSansKr(
+                     fontSize: 20,
+                     fontWeight: FontWeight.w800,
                      height: 1.1,
+                     color: Colors.black,
                      ),
                   ),
                   TextButton(
                     onPressed: () {
-                      // TODO: 뱃지도감 화면으로 이동 연결 예정
+                      // ✅ 연결됨: 뱃지도감 화면으로 이동
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BadgeBookScreen(),
+                        ),
+                      );
                     },
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
@@ -205,11 +226,10 @@ class ProfileScreen extends StatelessWidget {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     child: Text('더보기',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
+                    style: GoogleFonts.notoSansKr(
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
-                      color:const Color(0xFF636037).withOpacity(0.5),
+                      color: const Color(0xFF636037).withOpacity(0.5),
                       ),
                     ),
                   ),

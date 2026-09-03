@@ -39,7 +39,7 @@ class _ReportScreenState extends State<ReportScreen> {
               children: [
                 const SizedBox(height: 24),
 
-                // ── "산책 리포트" 타이틀 ──
+                // ── "산책 리포트" 타이틀 (내 친구 화면과 굵기 통일: w800 → w600) ──
                 const Text(
                   '산책 리포트',
                   style: TextStyle(
@@ -77,7 +77,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   '견종 권장량 달성률',
                   style: TextStyle(
                     fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     fontSize: 20,
                     height: 1.1,
                     color: Colors.black,
@@ -98,7 +98,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   data.growthTitle,
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     fontSize: 20,
                     height: 1.1,
                     color: Colors.black,
@@ -118,7 +118,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   data.badgeTitle,
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     fontSize: 20,
                     height: 1.1,
                     color: Colors.black,
