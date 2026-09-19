@@ -4,7 +4,7 @@ import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'SignUp.dart';
 import 'SignUpInfo1.dart';
-import 'ResetPW.dart';
+import 'FindPW.dart';
 import 'main_shell.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
@@ -74,7 +74,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        // 로그인 성공 시 MainShellScreen으로 진입
+        // 💡 일반 로그인은 '기존 유저'이므로 팝업 없이 MainShellScreen으로 진입
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const MainShellScreen()),
@@ -109,11 +109,11 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        final bool isNewUser = result['is_new_user'] ?? false;
+        final bool isNewUser = result['is_new'] ?? false;
         final String userId = result['user_id']?.toString() ?? '';
 
         if (isNewUser) {
-          // 신규 가입 유저 -> 프로필/반려견 등록 화면으로 이동
+          // 신규 가입 유저 -> 프로필 등록으로 이동 (등록 완료 후 팝업 띄움)
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -121,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          // 기존 유저 -> 메인 쉘 홈으로 이동
+          // 기존 유저 -> 팝업 없이 메인 쉘 홈으로 이동
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const MainShellScreen()),
@@ -237,12 +237,12 @@ class _LoginPageState extends State<LoginPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const ResetPW(),
+                                builder: (context) => const FindPW(),
                               ),
                             );
                           },
                           child: const Text(
-                            '비밀번호 재설정',
+                            '비밀번호 찾기',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.black87,

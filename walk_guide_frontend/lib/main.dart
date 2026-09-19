@@ -28,10 +28,10 @@ class WalkGuideApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9E5),
       ),
       // 1. 기본 정상 진입 화면 (로그인 화면)
-      //home: const LoginPage(),
+      home: const LoginPage(),
 
       // 2. 언니가 단독 화면 테스트할 때 아래처럼 home을 교체해서 사용 가능:
-      home: const MainShellScreen(),
+      //home: const MainShellScreen(),
     );
   }
 }

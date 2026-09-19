@@ -2,32 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
-import 'SignUpInfo1.dart';
 
 const Color primaryGreen = Color(0xFF27722F);
 
-class SignUp extends StatefulWidget {
-  const SignUp({super.key});
+class FindPW extends StatefulWidget {
+  const FindPW({super.key});
 
   @override
-  State<SignUp> createState() => _SignUpState();
+  State<FindPW> createState() => _FindPWState();
 }
 
-class _SignUpState extends State<SignUp> {
+class _FindPWState extends State<FindPW> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
   final TextEditingController _codeController = TextEditingController();
 
-  bool _isLoading = false;
   bool _isRequestingCode = false;
+  bool _isRequestingTempPW = false;
+
+  // 인증번호 발송 상태를 추적하여 하단 UI를 조건부로 띄움
+  bool _isCodeSent = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     _codeController.dispose();
     super.dispose();
   }
@@ -36,7 +33,7 @@ class _SignUpState extends State<SignUp> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  // 팝업 함수
+  // 커스텀 팝업
   void _showStyledDialog(String title, String subtitle) {
     showDialog(
       context: context,
@@ -62,8 +59,9 @@ class _SignUpState extends State<SignUp> {
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center, // 중앙 정렬
                     children: [
+                      // 연두색 느낌표 원형 아이콘
                       Container(
                         width: 85,
                         height: 85,
@@ -84,6 +82,7 @@ class _SignUpState extends State<SignUp> {
                         ),
                       ),
                       const SizedBox(height: 24),
+                      // 메인 타이틀
                       Text(
                         title,
                         textAlign: TextAlign.center,
@@ -96,6 +95,7 @@ class _SignUpState extends State<SignUp> {
                         ),
                       ),
                       const SizedBox(height: 10),
+                      // 서브 타이틀
                       Text(
                         subtitle,
                         textAlign: TextAlign.center,
@@ -148,12 +148,15 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isRequestingCode = true);
 
     try {
-      // TODO: 백엔드 API 연동 (인증번호 발송)
+      // TODO: 백엔드 API 연동 (인증번호 발송 API)
       await Future.delayed(const Duration(seconds: 1)); // 통신 딜레이 모방
 
       if (!mounted) return;
 
-      setState(() => _isRequestingCode = false);
+      setState(() {
+        _isRequestingCode = false;
+        _isCodeSent = true;
+      });
     } catch (e) {
       setState(() => _isRequestingCode = false);
       if (!mounted) return;
@@ -161,59 +164,39 @@ class _SignUpState extends State<SignUp> {
     }
   }
 
-  // 2. 회원가입 진행 로직
-  Future<void> _handleSignUp() async {
+  // 2. 임시 비밀번호 받기 로직
+  Future<void> _handleIssueTempPassword() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-    final confirmPassword = _confirmPasswordController.text.trim();
     final code = _codeController.text.trim();
 
-    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
-      _showStyledDialog('입력 오류', '모든 필드를 입력해주세요.');
+    if (email.isEmpty || code.isEmpty) {
+      _showStyledDialog('입력 오류', '이메일과 인증번호를\n모두 입력해주세요.');
       return;
     }
 
-    if (password.length < 6) {
-      _showStyledDialog('입력 오류', '비밀번호는 최소 6자리\n이상이어야 합니다.');
-      return;
-    }
-
-    if (password != confirmPassword) {
-      _showStyledDialog('비밀번호가\n일치하지 않습니다', '다시 입력해주시겠어요');
-      return;
-    }
-
-    if (code.isEmpty) {
-      _showStyledDialog('입력 오류', '인증번호를 입력해주세요.');
-      return;
-    }
-
-    // 💡 테스트용 인증번호 검증 (실제론 서버 통신으로 검증)
+    // 예시: 인증번호가 틀렸다고 가정한 UI 테스트 (실 연동시에는 서버 응답값으로 처리)
     if (code != "1234") {
       _showStyledDialog('인증번호가\n일치하지 않습니다', '다시 입력해주시겠어요');
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isRequestingTempPW = true);
 
     try {
-      final result = await ApiService.signUp(email, password, "");
-      setState(() => _isLoading = false);
+      // TODO: 백엔드 API 연동 (인증번호 검증 및 임시 비밀번호 발급 API)
+      await Future.delayed(const Duration(seconds: 1)); // 통신 딜레이 모방
 
+      setState(() => _isRequestingTempPW = false);
       if (!mounted) return;
 
-      if (result['success'] == true) {
-        final String userId = result['user_id']?.toString() ?? '1';
+      _showStyledDialog('발급 완료', '이메일로 임시 비밀번호가 전송되었습니다.\n로그인 후 비밀번호를 변경해주세요.');
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => SignUpInfo1(userId: userId)),
-        );
-      } else {
-        _showStyledDialog('가입 실패', result['message'] ?? '처리 중 오류가 발생했습니다.');
-      }
+      // 2초 뒤 로그인 화면으로 자동 복귀
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) Navigator.pop(context);
+      });
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() => _isRequestingTempPW = false);
       if (!mounted) return;
       _showStyledDialog('오류', '서버와의 통신 중\n오류가 발생했습니다.');
     }
@@ -226,6 +209,7 @@ class _SignUpState extends State<SignUp> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // 배경 경로 이미지
           Positioned(
             top: 230,
             left: 0,
@@ -236,6 +220,7 @@ class _SignUpState extends State<SignUp> {
               fit: BoxFit.fill,
             ),
           ),
+          // 우측 나무 이미지
           Positioned(
             top: 103,
             left: 269,
@@ -243,6 +228,7 @@ class _SignUpState extends State<SignUp> {
             height: 147,
             child: Image.asset('assets/images/trees.png', fit: BoxFit.contain),
           ),
+
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -255,6 +241,7 @@ class _SignUpState extends State<SignUp> {
                   children: [
                     const SizedBox(height: 228),
 
+                    // 뒤로가기 버튼
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Row(
@@ -275,73 +262,57 @@ class _SignUpState extends State<SignUp> {
                     ),
                     const SizedBox(height: 24),
 
+                    // 타이틀
                     Text(
-                      'Sign Up',
+                      'Find Password',
                       style: GoogleFonts.inter(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: primaryGreen,
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 24),
 
+                    // 1. 이메일 입력 영역
                     CustomTextField(
                       controller: _emailController,
                       hintText: 'E-mail',
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-
-                    CustomTextField(
-                      controller: _passwordController,
-                      hintText: 'Password',
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 12),
-
-                    CustomTextField(
-                      controller: _confirmPasswordController,
-                      hintText: 'Confirm Password',
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _codeController,
-                            hintText: 'Enter code',
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 118,
-                          child: _isRequestingCode
-                              ? const Center(
-                                  child: CircularProgressIndicator(
-                                    color: primaryGreen,
-                                  ),
-                                )
-                              : CustomButton(
-                                  text: '인증번호 받기',
-                                  onPressed: _handleRequestAuthCode,
-                                  fontSize: 12.0,
-                                ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 회원가입 버튼
-                    _isLoading
+                    _isRequestingCode
                         ? const Center(
                             child: CircularProgressIndicator(
                               color: primaryGreen,
                             ),
                           )
-                        : CustomButton(text: '회원가입', onPressed: _handleSignUp),
+                        : CustomButton(
+                            text: '인증번호 받기',
+                            onPressed: _handleRequestAuthCode,
+                          ),
+
+                    // 2. 인증번호 발송이 완료되었을 때 하단 UI 표시
+                    if (_isCodeSent) ...[
+                      const SizedBox(height: 50),
+
+                      CustomTextField(
+                        controller: _codeController,
+                        hintText: 'Enter code',
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      _isRequestingTempPW
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: primaryGreen,
+                              ),
+                            )
+                          : CustomButton(
+                              text: '임시 비밀번호 받기',
+                              onPressed: _handleIssueTempPassword,
+                            ),
+                    ],
+
                     const SizedBox(height: 20),
                   ],
                 ),

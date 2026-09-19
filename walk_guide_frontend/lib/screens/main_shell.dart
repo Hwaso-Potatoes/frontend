@@ -23,7 +23,7 @@ class MainShellScreen extends StatefulWidget {
 class _MainShellScreenState extends State<MainShellScreen> {
   late int _currentIndex;
 
-  // 💡 핵심: 탭마다(홈/리포트/친구/프로필) 자기만의 "화면 스택"을 갖게 하려고
+  // 핵심: 탭마다(홈/리포트/친구/프로필) 자기만의 "화면 스택"을 갖게 하려고
   // Navigator를 4개 따로 만듦. 이 키로 각 탭의 Navigator를 나중에 찾아서 조작함.
   // (index 2는 "산책"인데, 탭 전환이 아니라 화면 전체를 덮는 push라서 여기 없음)
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
@@ -72,7 +72,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     }
   }
 
-  // 💡 여기가 핵심: 각 탭을 "자기만의 미니 Navigator"로 감싸는 부분.
+  // 여기가 핵심: 각 탭을 "자기만의 미니 Navigator"로 감싸는 부분.
   // 이 안에서 Navigator.push(context, ...)를 부르면, 이 미니 Navigator 안에
   // 새 화면이 쌓이는 거라서 바깥의 바텀바는 그대로 남아있음.
   // (예: 홈 탭 안에서 "더보기" 눌러 미션 화면으로 가도, 바는 안 사라짐)
@@ -96,8 +96,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
       return;
     }
 
-    _navigatorKeys[_navKeyIndex(index)].currentState
-        ?.popUntil((route) => route.isFirst);
+    _navigatorKeys[_navKeyIndex(index)].currentState?.popUntil(
+      (route) => route.isFirst,
+    );
 
     setState(() {
       _currentIndex = index;
@@ -108,6 +109,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9E5),
+      extendBody: true,
       body: IndexedStack(
         index: _navKeyIndex(_currentIndex),
         children: [

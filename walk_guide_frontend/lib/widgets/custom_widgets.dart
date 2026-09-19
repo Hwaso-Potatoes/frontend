@@ -53,6 +53,7 @@ class CustomButton extends StatelessWidget {
   final Color backgroundColor;
   final Color textColor;
   final Color? borderColor;
+  final double fontSize;
 
   const CustomButton({
     super.key,
@@ -61,6 +62,7 @@ class CustomButton extends StatelessWidget {
     this.backgroundColor = primaryGreen,
     this.textColor = Colors.white,
     this.borderColor,
+    this.fontSize = 15.0,
   });
 
   @override
@@ -94,7 +96,7 @@ class CustomButton extends StatelessWidget {
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: fontSize,
               fontWeight: FontWeight.bold,
               color: textColor,
             ),
@@ -147,7 +149,7 @@ Future<void> showCustomDialog({
   );
 }
 
-//  공통 하단 네비게이션 바 위젯
+// 공통 하단 네비게이션 바 위젯 (배경/테두리 제거 버전)
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -166,15 +168,10 @@ class CustomBottomNavBar extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         clipBehavior: Clip.none,
         children: [
-          // 1. 하단 바 흰색 직사각형 배경 (상단 얇은 라인 처리)
+          // 1. 하단 바 직사각형 배경 (얇은 회색 선 제거됨)
           Container(
             height: 60,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
-              ),
-            ),
+            decoration: const BoxDecoration(color: Colors.white),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -202,14 +199,14 @@ class CustomBottomNavBar extends StatelessWidget {
             ),
           ),
 
-          // 2. 바 위로 솟아오르는 원형 뒷배경 (바와 동일한 흰색으로 자연스럽게 연결)
+          // 2. 바 위로 솟아오르는 원형 뒷배경 투명하게 처리
           Positioned(
             top: -15,
             child: Container(
               width: 68,
               height: 68,
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: Colors.transparent,
                 shape: BoxShape.circle,
               ),
             ),

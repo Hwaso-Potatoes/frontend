@@ -5,8 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'walk_tracking.dart';
-import 'mission_screen.dart'; // ✅ "더보기" -> 미션 화면 연결용
-import 'decorate_screen.dart'; // ✅ "꾸미러가기" -> 꾸미기 화면 연결용 (클래스명: DecorationScreen)
+import 'mission_screen.dart';
+import 'decorate_screen.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -45,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showPermissionDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       barrierDismissible: false,
       builder: (context) => const PermissionDialog(),
     );
@@ -57,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ✅ 오늘의 미션 "더보기" -> 미션 화면
   void _navigateToMissionScreen() {
     Navigator.push(
       context,
@@ -65,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ✅ "꾸미러가기" -> 꾸미기 화면
   void _navigateToDecorationScreen() {
     Navigator.push(
       context,
@@ -138,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Container(
                           width: double.infinity,
                           decoration: const BoxDecoration(
-                            color: backgroundColor, // 💡 F8F9E5로 완전 통일
+                            color: backgroundColor,
                             borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(32),
                               topRight: Radius.circular(32),
@@ -148,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             left: 24,
                             right: 24,
                             top: 24,
-                            bottom: 60, // 바텀바와 자연스럽게 이어지도록 여백 설정
+                            bottom: 60,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,10 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(height: 28),
                               _buildDailyMissionsSection(data.dailyMissions),
                               const SizedBox(height: 28),
-                              CustomButton(
-                                text: '산책 시작하기',
-                                onPressed: _navigateToWalkTracking,
-                              ),
                             ],
                           ),
                         ),
@@ -227,74 +222,52 @@ class _HomeScreenState extends State<HomeScreen> {
   // 상단 히어로 영역
   Widget _buildTopHeroSection(
     String userName,
-
     String? petImageUrl,
-
     String breed,
   ) {
     return SizedBox(
       width: double.infinity,
-
       height: 435,
-
       child: Stack(
         clipBehavior: Clip.none,
-
         children: [
           Positioned.fill(
             child: SvgPicture.asset(
               'assets/images/background.svg',
-
               fit: BoxFit.cover,
-
               errorBuilder: (context, error, stackTrace) =>
                   Container(color: const Color(0xFFF1F3D8)),
             ),
           ),
-
           Positioned.fill(
             child: Align(
               alignment: Alignment.bottomCenter,
-
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 95.0),
-
                 child: SizedBox(
                   width: 250,
-
                   height: 250,
-
                   child: Stack(
                     alignment: Alignment.bottomCenter,
-
                     clipBehavior: Clip.none,
-
                     children: [
-                      // 1. 강아지 그림자
                       Positioned(
                         bottom: 26,
-
                         child: Container(
                           width: 180,
-
                           height: 18,
-
                           decoration: BoxDecoration(
                             color: const Color(
                               0xFF636037,
                             ).withValues(alpha: 0.28),
-
                             borderRadius: const BorderRadius.all(
                               Radius.elliptical(135, 14),
                             ),
                           ),
                         ),
                       ),
-
-                      // 2. 강아지 이미지 (240px 크기)
                       Positioned(
                         bottom: 0,
-
                         child: _buildDogImage(petImageUrl, breed, size: 320),
                       ),
                     ],
@@ -303,86 +276,59 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
           SafeArea(
             bottom: false,
-
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24.0,
-
                 vertical: 12.0,
               ),
-
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-
                     children: [
                       const SizedBox(height: 50),
-
                       const Text(
                         '좋은 아침이에요',
-
                         style: TextStyle(
                           fontSize: 14,
-
                           fontWeight: FontWeight.w400,
-
                           color: Color(0xFF7A7955),
-
                           height: 1.0,
                         ),
                       ),
-
                       Text(
                         userName,
-
                         style: GoogleFonts.notoSansKr(
                           fontSize: 31,
-
                           fontWeight: FontWeight.w800,
-
                           color: Colors.black,
-
                           height: 1.1,
                         ),
                       ),
                     ],
                   ),
-
                   GestureDetector(
-                    onTap: _navigateToDecorationScreen, // ✅ 연결됨
-
+                    onTap: _navigateToDecorationScreen,
                     child: Padding(
                       padding: const EdgeInsets.only(top: 50.0),
-
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-
                         children: const [
                           Text(
                             '꾸미러가기',
-
                             style: TextStyle(
                               fontSize: 13,
-
                               fontWeight: FontWeight.w300,
-
                               color: Color(0xFF676543),
                             ),
                           ),
-
                           Icon(
                             Icons.chevron_right,
-
                             size: 16,
-
                             color: Color(0xFF676543),
                           ),
                         ],
@@ -445,8 +391,6 @@ class _HomeScreenState extends State<HomeScreen> {
       '퍼그': 'pug.png',
       '사모예드': 'samoyed.png',
       '슈나우저': 'schnauzer.png',
-      // ⚠️ 아래 4개는 견종이 아니라 더미 "친구" 이름을 임시로 땜빵한 것.
-      // TODO: 친구 더미데이터에 실제 breed 필드 생기면 이 4줄 삭제
       '초코': 'poodle.png',
       '밀크': 'samoyed.png',
       '토리': 'corgi.png',
@@ -744,7 +688,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             GestureDetector(
-              onTap: _navigateToMissionScreen, // ✅ 연결됨
+              onTap: _navigateToMissionScreen,
               child: const Text(
                 '더보기',
                 style: TextStyle(
@@ -856,6 +800,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// 권한 팝업창
 class PermissionDialog extends StatelessWidget {
   const PermissionDialog({super.key});
 
@@ -865,41 +810,45 @@ class PermissionDialog extends StatelessWidget {
       canPop: false,
       child: Dialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28.0),
+          borderRadius: BorderRadius.circular(24.0),
         ),
         backgroundColor: Colors.white,
-        elevation: 10,
+        elevation: 0,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 '더 편리한 서비스 이용을 위한\n접근 권한을 안내드립니다.',
-                style: TextStyle(
+                style: GoogleFonts.notoSansKr(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  height: 1.35,
+                  fontWeight: FontWeight.w900,
+                  height: 1.4,
                   color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               _buildPermissionItem(
                 icon: Icons.location_on_outlined,
                 title: '위치 정보',
                 isOptional: true,
                 description: '산책 경로 기록과 근처 친구 확인',
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 24),
               _buildPermissionItem(
                 icon: Icons.notifications_none_outlined,
                 title: '알림',
                 isOptional: true,
                 description: '산책 리마인더와 주간 리포트 알림',
               ),
-              const SizedBox(height: 28),
-              CustomButton(text: '확인', onPressed: () => Navigator.pop(context)),
+              const SizedBox(height: 40),
+              CustomButton(
+                text: '확인',
+                backgroundColor: const Color(0xFF496B31),
+                onPressed: () => Navigator.pop(context),
+              ),
             ],
           ),
         ),
@@ -914,15 +863,16 @@ class PermissionDialog extends StatelessWidget {
     required String description,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF90C271), width: 1.8),
+            border: Border.all(color: const Color(0xFFA5D179), width: 1.5),
           ),
-          child: Icon(icon, color: const Color(0xFF90C271), size: 22),
+          child: Icon(icon, color: const Color(0xFFA5D179), size: 22),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -933,7 +883,7 @@ class PermissionDialog extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: GoogleFonts.notoSansKr(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
@@ -941,12 +891,12 @@ class PermissionDialog extends StatelessWidget {
                   ),
                   if (isOptional) ...[
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       '(선택)',
-                      style: TextStyle(
+                      style: GoogleFonts.notoSansKr(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black38,
+                        color: Colors.black45,
                       ),
                     ),
                   ],
@@ -955,7 +905,10 @@ class PermissionDialog extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 description,
-                style: const TextStyle(fontSize: 12, color: Colors.black45),
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 12,
+                  color: Colors.black45,
+                ),
               ),
             ],
           ),
