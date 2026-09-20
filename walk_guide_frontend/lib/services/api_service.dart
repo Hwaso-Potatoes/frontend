@@ -472,11 +472,57 @@ class ApiService {
     }
   }
 
-  // [회원가입 API]
+  // 회원가입 - 1. 이메일 인증번호 요청 API
+  static Future<Map<String, dynamic>> requestEmailVerification(
+    String email,
+  ) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return {'success': true};
+    }
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/users/register/email/request/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      );
+      return {'success': response.statusCode == 200};
+    } catch (e) {
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
+
+  // 회원가입 - 2. 이메일 인증번호 확인 API
+  static Future<Map<String, dynamic>> verifyEmailCode(
+    String email,
+    String code,
+  ) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return {'success': true, 'verification_token': 'mock_verification_token'};
+    }
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/users/register/email/verify/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'code': code}),
+      );
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200,
+        'verification_token': data['verification_token'],
+      };
+    } catch (e) {
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
+
+  // 회원가입 - 3. 최종 회원가입 API (verification_token 포함)
   static Future<Map<String, dynamic>> signUp(
     String email,
     String password,
     String passwordConfirm,
+    String verificationToken, // 추가됨
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -490,6 +536,7 @@ class ApiService {
           'email': email,
           'password': password,
           'password2': passwordConfirm,
+          'verification_token': verificationToken, // 백엔드 명세에 맞춤
         }),
       );
       final data = jsonDecode(response.body);
@@ -502,17 +549,19 @@ class ApiService {
     }
   }
 
-  // [프로필 수정 API]
-  static Future<Map<String, dynamic>> updateUserProfile(
-    String userId,
-    String nickname,
+  // 로그인 전 비밀번호 찾기 (이메일로 재설정 링크 발송 API)
+  static Future<Map<String, dynamic>> requestPasswordResetLink(
+    String email,
   ) async {
-    if (useMockData) return {'success': true};
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return {'success': true};
+    }
     try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/api/users/$userId/'),
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/users/password-reset/request/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'nickname': nickname}),
+        body: jsonEncode({'email': email}),
       );
       return {'success': res.statusCode == 200};
     } catch (e) {
@@ -523,6 +572,7 @@ class ApiService {
   // [반려견 등록 API]
   static Future<Map<String, dynamic>> registerPet({
     required String accessToken,
+    required String nickname,
     required String name,
     required String breed,
     required String birthDate,
@@ -539,6 +589,7 @@ class ApiService {
       // 헤더에 인증 토큰 담기
       request.headers['Authorization'] = 'Bearer $accessToken';
 
+      request.fields['nickname'] = nickname;
       request.fields['name'] = name;
       request.fields['breed'] = breed;
       request.fields['birth_date'] = birthDate;
@@ -561,23 +612,26 @@ class ApiService {
     }
   }
 
-  // [비밀번호 변경 API]
-  static Future<Map<String, dynamic>> resetPassword(
-    String accessToken,
-    String newPassword,
-    String newPasswordConfirm,
-  ) async {
-    if (useMockData) return {'success': true};
+  // 로그인 전 메일 링크를 통한 비밀번호 재설정 확정 API
+  static Future<Map<String, dynamic>> confirmPasswordReset({
+    required String uid,
+    required String token,
+    required String newPassword,
+    required String newPassword2,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return {'success': true};
+    }
     try {
       final res = await http.post(
-        Uri.parse('$baseUrl/api/users/password/reset/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
+        Uri.parse('$baseUrl/api/users/password-reset/confirm/'),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
+          'uid': uid,
+          'token': token,
           'new_password': newPassword,
-          'new_password_confirm': newPasswordConfirm,
+          'new_password2': newPassword2,
         }),
       );
       return {'success': res.statusCode == 200};

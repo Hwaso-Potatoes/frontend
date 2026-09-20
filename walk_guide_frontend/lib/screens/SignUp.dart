@@ -26,6 +26,9 @@ class _SignUpState extends State<SignUp> {
   bool _isCodeSent = false;
   bool _isCodeVerified = false;
 
+  // 백엔드로부터 발급받은 인증 프리패스 토큰을 저장할 변수
+  String _verificationToken = "";
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +36,6 @@ class _SignUpState extends State<SignUp> {
     _confirmPasswordController.addListener(_onPasswordChanged);
   }
 
-  // 글자가 하나라도 바뀔 때마다 무한으로 화면을 새로고침하여 상태를 확인합니다.
   void _onPasswordChanged() {
     setState(() {});
   }
@@ -163,13 +165,18 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isRequestingCode = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      final result = await ApiService.requestEmailVerification(email);
       if (!mounted) return;
 
-      setState(() {
-        _isRequestingCode = false;
-        _isCodeSent = true;
-      });
+      if (result['success'] == true) {
+        setState(() {
+          _isRequestingCode = false;
+          _isCodeSent = true;
+        });
+      } else {
+        setState(() => _isRequestingCode = false);
+        _showStyledDialog('오류', '인증번호 발송에 실패했습니다.');
+      }
     } catch (e) {
       setState(() => _isRequestingCode = false);
       if (!mounted) return;
@@ -178,6 +185,7 @@ class _SignUpState extends State<SignUp> {
   }
 
   Future<void> _handleVerifyAuthCode() async {
+    final email = _emailController.text.trim();
     final code = _codeController.text.trim();
 
     if (code.isEmpty) {
@@ -188,12 +196,16 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isRequestingCode = true);
 
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
+      final result = await ApiService.verifyEmailCode(email, code);
       if (!mounted) return;
+
       setState(() => _isRequestingCode = false);
 
-      if (code == "1234") {
-        setState(() => _isCodeVerified = true);
+      if (result['success'] == true && result['verification_token'] != null) {
+        setState(() {
+          _isCodeVerified = true;
+          _verificationToken = result['verification_token'];
+        });
         _showStyledDialog('인증 성공', '인증번호가 확인되었습니다.');
       } else {
         _showStyledDialog('인증번호 불일치', '인증번호가 올바르지 않습니다.');
@@ -225,7 +237,7 @@ class _SignUpState extends State<SignUp> {
       return;
     }
 
-    if (!_isCodeVerified) {
+    if (!_isCodeVerified || _verificationToken.isEmpty) {
       _showStyledDialog('인증 필요', '이메일 인증을 먼저 완료해주세요.');
       return;
     }
@@ -233,20 +245,43 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await ApiService.signUp(email, password, confirmPassword);
-      setState(() => _isLoading = false);
+      // 1. 회원가입 API 호출
+      final signUpResult = await ApiService.signUp(
+        email,
+        password,
+        confirmPassword,
+        _verificationToken,
+      );
 
-      if (!mounted) return;
+      if (signUpResult['success'] == true) {
+        // 2. 가입 성공 직후 자동으로 로그인 API를 호출하여 "진짜 토큰"을 발급받음
+        final loginResult = await ApiService.login(email, password);
+        setState(() => _isLoading = false);
 
-      if (result['success'] == true) {
-        final String userId = result['id']?.toString() ?? '1';
+        if (!mounted) return;
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => SignUpInfo1(userId: userId)),
-        );
+        if (loginResult['success'] == true) {
+          final String userId = signUpResult['id']?.toString() ?? '1';
+          final String accessToken = loginResult['access'] ?? 'mock_token';
+
+          // 발급받은 진짜 토큰을 다음 화면으로 넘겨줌
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  SignUpInfo1(userId: userId, accessToken: accessToken),
+            ),
+          );
+        } else {
+          _showStyledDialog('안내', '가입은 완료되었으나 자동 로그인에 실패했습니다. 다시 로그인해주세요.');
+        }
       } else {
-        _showStyledDialog('가입 실패', result['message'] ?? '처리 중 오류가 발생했습니다.');
+        setState(() => _isLoading = false);
+        if (!mounted) return;
+        _showStyledDialog(
+          '가입 실패',
+          signUpResult['message'] ?? '처리 중 오류가 발생했습니다.',
+        );
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -339,7 +374,6 @@ class _SignUpState extends State<SignUp> {
                       hintText: 'Confirm Password',
                       obscureText: true,
                     ),
-
                     if (isPasswordMismatch)
                       const Padding(
                         padding: EdgeInsets.only(top: 6.0, left: 6.0),
@@ -352,7 +386,6 @@ class _SignUpState extends State<SignUp> {
                           ),
                         ),
                       ),
-
                     const SizedBox(height: 12),
                     Row(
                       children: [

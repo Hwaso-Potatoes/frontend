@@ -14,18 +14,11 @@ class FindPW extends StatefulWidget {
 
 class _FindPWState extends State<FindPW> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _codeController = TextEditingController();
-
-  bool _isRequestingCode = false;
-  bool _isRequestingTempPW = false;
-
-  // 인증번호 발송 상태를 추적하여 하단 UI를 조건부로 띄움
-  bool _isCodeSent = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _codeController.dispose();
     super.dispose();
   }
 
@@ -33,7 +26,6 @@ class _FindPWState extends State<FindPW> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  // 커스텀 팝업
   void _showStyledDialog(String title, String subtitle) {
     showDialog(
       context: context,
@@ -59,9 +51,8 @@ class _FindPWState extends State<FindPW> {
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center, // 중앙 정렬
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // 연두색 느낌표 원형 아이콘
                       Container(
                         width: 85,
                         height: 85,
@@ -82,7 +73,6 @@ class _FindPWState extends State<FindPW> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // 메인 타이틀
                       Text(
                         title,
                         textAlign: TextAlign.center,
@@ -95,7 +85,6 @@ class _FindPWState extends State<FindPW> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      // 서브 타이틀
                       Text(
                         subtitle,
                         textAlign: TextAlign.center,
@@ -131,8 +120,8 @@ class _FindPWState extends State<FindPW> {
     );
   }
 
-  // 1. 인증번호 받기 로직
-  Future<void> _handleRequestAuthCode() async {
+  // 비밀번호 재설정 링크 API 호출 연동
+  Future<void> _handleSendResetLink() async {
     final email = _emailController.text.trim();
 
     if (email.isEmpty) {
@@ -145,58 +134,27 @@ class _FindPWState extends State<FindPW> {
       return;
     }
 
-    setState(() => _isRequestingCode = true);
+    setState(() => _isLoading = true);
 
     try {
-      // TODO: 백엔드 API 연동 (인증번호 발송 API)
-      await Future.delayed(const Duration(seconds: 1)); // 통신 딜레이 모방
-
+      final result = await ApiService.requestPasswordResetLink(email);
       if (!mounted) return;
 
-      setState(() {
-        _isRequestingCode = false;
-        _isCodeSent = true;
-      });
+      setState(() => _isLoading = false);
+
+      if (result['success'] == true) {
+        _showStyledDialog('전송 완료', '비밀번호 재설정 링크가 포함된\n이메일을 발송했습니다.');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pop(context); // 팝업 닫기
+            Navigator.pop(context); // 로그인 화면으로 돌아가기
+          }
+        });
+      } else {
+        _showStyledDialog('오류', '링크 전송에 실패했습니다.\n가입된 이메일인지 확인해주세요.');
+      }
     } catch (e) {
-      setState(() => _isRequestingCode = false);
-      if (!mounted) return;
-      _showStyledDialog('오류', '서버와의 통신 중\n오류가 발생했습니다.');
-    }
-  }
-
-  // 2. 임시 비밀번호 받기 로직
-  Future<void> _handleIssueTempPassword() async {
-    final email = _emailController.text.trim();
-    final code = _codeController.text.trim();
-
-    if (email.isEmpty || code.isEmpty) {
-      _showStyledDialog('입력 오류', '이메일과 인증번호를\n모두 입력해주세요.');
-      return;
-    }
-
-    // 예시: 인증번호가 틀렸다고 가정한 UI 테스트 (실 연동시에는 서버 응답값으로 처리)
-    if (code != "1234") {
-      _showStyledDialog('인증번호가\n일치하지 않습니다', '다시 입력해주시겠어요');
-      return;
-    }
-
-    setState(() => _isRequestingTempPW = true);
-
-    try {
-      // TODO: 백엔드 API 연동 (인증번호 검증 및 임시 비밀번호 발급 API)
-      await Future.delayed(const Duration(seconds: 1)); // 통신 딜레이 모방
-
-      setState(() => _isRequestingTempPW = false);
-      if (!mounted) return;
-
-      _showStyledDialog('발급 완료', '이메일로 임시 비밀번호가 전송되었습니다.\n로그인 후 비밀번호를 변경해주세요.');
-
-      // 2초 뒤 로그인 화면으로 자동 복귀
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) Navigator.pop(context);
-      });
-    } catch (e) {
-      setState(() => _isRequestingTempPW = false);
+      setState(() => _isLoading = false);
       if (!mounted) return;
       _showStyledDialog('오류', '서버와의 통신 중\n오류가 발생했습니다.');
     }
@@ -209,7 +167,6 @@ class _FindPWState extends State<FindPW> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 배경 경로 이미지
           Positioned(
             top: 230,
             left: 0,
@@ -220,7 +177,6 @@ class _FindPWState extends State<FindPW> {
               fit: BoxFit.fill,
             ),
           ),
-          // 우측 나무 이미지
           Positioned(
             top: 103,
             left: 269,
@@ -228,7 +184,6 @@ class _FindPWState extends State<FindPW> {
             height: 147,
             child: Image.asset('assets/images/trees.png', fit: BoxFit.contain),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -240,8 +195,6 @@ class _FindPWState extends State<FindPW> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 228),
-
-                    // 뒤로가기 버튼
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Row(
@@ -261,8 +214,6 @@ class _FindPWState extends State<FindPW> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // 타이틀
                     Text(
                       'Find Password',
                       style: GoogleFonts.inter(
@@ -271,49 +222,25 @@ class _FindPWState extends State<FindPW> {
                         color: primaryGreen,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 30),
 
-                    // 1. 이메일 입력 영역
                     CustomTextField(
                       controller: _emailController,
-                      hintText: 'E-mail',
+                      hintText: '가입하신 E-mail을 입력해주세요',
                       keyboardType: TextInputType.emailAddress,
                     ),
-                    const SizedBox(height: 12),
-                    _isRequestingCode
+                    const SizedBox(height: 24),
+
+                    _isLoading
                         ? const Center(
                             child: CircularProgressIndicator(
                               color: primaryGreen,
                             ),
                           )
                         : CustomButton(
-                            text: '인증번호 받기',
-                            onPressed: _handleRequestAuthCode,
+                            text: '재설정 링크 받기',
+                            onPressed: _handleSendResetLink,
                           ),
-
-                    // 2. 인증번호 발송이 완료되었을 때 하단 UI 표시
-                    if (_isCodeSent) ...[
-                      const SizedBox(height: 50),
-
-                      CustomTextField(
-                        controller: _codeController,
-                        hintText: 'Enter code',
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 12),
-                      _isRequestingTempPW
-                          ? const Center(
-                              child: CircularProgressIndicator(
-                                color: primaryGreen,
-                              ),
-                            )
-                          : CustomButton(
-                              text: '임시 비밀번호 받기',
-                              onPressed: _handleIssueTempPassword,
-                            ),
-                    ],
-
-                    const SizedBox(height: 20),
                   ],
                 ),
               ),

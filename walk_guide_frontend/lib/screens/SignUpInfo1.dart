@@ -9,8 +9,13 @@ const Color primaryGreen = Color(0xFF27722F);
 
 class SignUpInfo1 extends StatefulWidget {
   final String userId;
+  final String accessToken;
 
-  const SignUpInfo1({super.key, required this.userId});
+  const SignUpInfo1({
+    super.key,
+    required this.userId,
+    required this.accessToken,
+  });
 
   @override
   State<SignUpInfo1> createState() => _SignUpInfo1State();
@@ -35,8 +40,11 @@ class _SignUpInfo1State extends State<SignUpInfo1> {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            SignUpInfo2(userId: widget.userId, nickname: nickname),
+        pageBuilder: (context, animation, secondaryAnimation) => SignUpInfo2(
+          userId: widget.userId,
+          nickname: nickname,
+          accessToken: widget.accessToken,
+        ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: animation.drive(CurveTween(curve: Curves.easeInOut)),
@@ -92,9 +100,7 @@ class _SignUpInfo1State extends State<SignUpInfo1> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
             // 3. 본문 영역
             Expanded(
               child: Padding(
@@ -119,9 +125,7 @@ class _SignUpInfo1State extends State<SignUpInfo1> {
                         },
                       ),
                     ),
-
                     const SizedBox(height: 30),
-
                     Text(
                       '성함을 알려주세요',
                       style: GoogleFonts.notoSansKr(
@@ -131,25 +135,18 @@ class _SignUpInfo1State extends State<SignUpInfo1> {
                         color: Colors.black,
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
                     CustomTextField(
                       controller: _nicknameController,
                       hintText: '이름을 입력해 주세요',
                     ),
-
                     const SizedBox(height: 12),
-
                     const Text(
                       '나중에 프로필 설정에서 바꿀 수 있어요',
                       style: TextStyle(fontSize: 12, color: Color(0xFF817F5A)),
                     ),
-
                     const Spacer(),
-
                     CustomButton(text: '다음으로', onPressed: _nextStep),
-
                     const SizedBox(height: 20),
                   ],
                 ),

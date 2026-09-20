@@ -10,8 +10,14 @@ const Color primaryGreen = Color(0xFF27722F);
 class SignUpInfo2 extends StatefulWidget {
   final String userId;
   final String nickname;
+  final String accessToken;
 
-  const SignUpInfo2({super.key, required this.userId, required this.nickname});
+  const SignUpInfo2({
+    super.key,
+    required this.userId,
+    required this.nickname,
+    required this.accessToken,
+  });
 
   @override
   State<SignUpInfo2> createState() => _SignUpInfo2State();
@@ -86,6 +92,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
           breed: breed.isEmpty ? '미정' : breed,
           birthDate: birthDate,
           profileImage: _profileImagePath,
+          accessToken: widget.accessToken,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -145,9 +152,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
             // 3. 본문 영역
             Expanded(
               child: SingleChildScrollView(
@@ -173,9 +178,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           },
                         ),
                       ),
-
                       const SizedBox(height: 30),
-
                       Text(
                         '함께 떠날 강아지는\n누구인가요?',
                         style: GoogleFonts.notoSansKr(
@@ -186,9 +189,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           height: 1.3,
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
                       // 프로필 사진 등록
                       Center(
                         child: Stack(
@@ -239,9 +240,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
                       // 강아지 이름
                       const Text(
                         '강아지 이름',
@@ -256,9 +255,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         controller: _petNameController,
                         hintText: '이름을 입력해 주세요',
                       ),
-
                       const SizedBox(height: 16),
-
                       // 견종 선택
                       const Text(
                         '견종 선택',
@@ -273,9 +270,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         controller: _breedController,
                         hintText: '견종을 검색해주세요',
                       ),
-
                       const SizedBox(height: 16),
-
                       // 생년월일
                       const Text(
                         '생년월일',
@@ -320,9 +315,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
                       const Text(
                         '정확한 정보를 입력해주시면 강아지의 연령과 체력에 맞는 맞춤형 산책 코스를 추천해드려요',
                         style: TextStyle(
@@ -331,11 +324,8 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           color: Color(0xCC636037),
                         ),
                       ),
-
                       const SizedBox(height: 32),
-
                       CustomButton(text: '다음으로', onPressed: _nextStep),
-
                       const SizedBox(height: 24),
                     ],
                   ),

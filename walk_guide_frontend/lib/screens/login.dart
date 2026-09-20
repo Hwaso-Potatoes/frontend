@@ -110,16 +110,16 @@ class _LoginPageState extends State<LoginPage> {
       if (result['success'] == true) {
         final bool isNewUser = result['is_new'] ?? false;
 
-        // 향후 여기에 result['access'] 토큰을 기기에 저장하는 로직이 들어갑니다.
-
-        // 신규 유저에게 반려견 등록(SignUpInfo1) 창을 넘기기 위해 임시 아이디 '1' 전달
-        final String userId = '1';
+        // 💡 소셜 로그인 성공 시 발급받은 토큰을 저장합니다.
+        final String accessToken = result['access'] ?? 'mock_token';
+        final String userId = result['user_id']?.toString() ?? '1';
 
         if (isNewUser) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => SignUpInfo1(userId: userId),
+              builder: (context) =>
+                  SignUpInfo1(userId: userId, accessToken: accessToken),
             ),
           );
         } else {

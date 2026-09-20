@@ -15,6 +15,7 @@ class SignUpInfo3 extends StatefulWidget {
   final String breed;
   final String birthDate;
   final String? profileImage;
+  final String accessToken;
 
   const SignUpInfo3({
     super.key,
@@ -24,6 +25,7 @@ class SignUpInfo3 extends StatefulWidget {
     required this.breed,
     required this.birthDate,
     this.profileImage,
+    required this.accessToken,
   });
 
   @override
@@ -59,17 +61,13 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
     setState(() => _isLoading = true);
 
     try {
-      final userRes = await ApiService.updateUserProfile(
-        widget.userId,
-        widget.nickname,
-      );
-
       final petRes = await ApiService.registerPet(
-        accessToken: 'mock_token', // 토큰 파라미터 추가! (실제 토큰 저장소 연동 전 임시값)
+        accessToken: widget.accessToken,
+        nickname: widget.nickname,
         name: widget.petName,
         breed: widget.breed,
         birthDate: widget.birthDate,
-        profileImagePath: widget.profileImage, // 변수명 일치
+        profileImagePath: widget.profileImage,
         personalities: _selectedPersonalities.toList(),
       );
 
@@ -77,8 +75,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
 
       if (!mounted) return;
 
-      if (userRes['success'] == true && petRes['success'] == true) {
-        // 성공 시 메인쉘(권한 팝업 옵션 활성화)로 전환
+      if (petRes['success'] == true) {
         Navigator.pushAndRemoveUntil(
           context,
           PageRouteBuilder(
@@ -98,8 +95,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
           (route) => false,
         );
       } else {
-        final errorMsg =
-            userRes['message'] ?? petRes['message'] ?? '등록에 실패했습니다.';
+        final errorMsg = petRes['message'] ?? '등록에 실패했습니다.';
         showCustomDialog(context: context, title: '오류', message: errorMsg);
       }
     } catch (e) {
@@ -121,7 +117,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 상단 네비게이션 헤더
             Padding(
               padding: const EdgeInsets.only(top: 79.0),
               child: SizedBox(
@@ -157,10 +152,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
-            // 본문 영역
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28.0),
@@ -183,7 +175,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         },
                       ),
                     ),
-
                     Stack(
                       children: [
                         Padding(
@@ -219,9 +210,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 8),
-
                     const Text(
                       '맞춤형 활동을 추천해드리기 위해 필요해요',
                       style: TextStyle(
@@ -231,9 +220,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         height: 1.3,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     const Text(
                       '복수선택 가능',
                       style: TextStyle(
@@ -242,10 +229,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         height: 1.3,
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
-                    // 성격 옵션 카드 그리드
                     Expanded(
                       child: GridView.builder(
                         itemCount: _personalityOptions.length,
@@ -340,9 +324,7 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                         },
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     _isLoading
                         ? const Center(
                             child: CircularProgressIndicator(
@@ -350,7 +332,6 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
                             ),
                           )
                         : CustomButton(text: '시작하기', onPressed: _submitData),
-
                     const SizedBox(height: 20),
                   ],
                 ),
