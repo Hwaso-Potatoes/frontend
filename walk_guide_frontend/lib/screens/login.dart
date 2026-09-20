@@ -32,7 +32,6 @@ class _LoginPageState extends State<LoginPage> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  // 1. 일반 이메일 로그인 처리
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -74,7 +73,8 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        // 💡 일반 로그인은 '기존 유저'이므로 팝업 없이 MainShellScreen으로 진입
+        // 향후 여기에 result['access'] 토큰을 기기에 저장하는 로직이 들어갑니다.
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const MainShellScreen()),
@@ -98,7 +98,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // 2. 소셜 로그인 처리 (POST api/users/socaillogin)
   Future<void> _handleSocialLogin(String provider) async {
     setState(() => _isLoading = true);
 
@@ -110,10 +109,13 @@ class _LoginPageState extends State<LoginPage> {
 
       if (result['success'] == true) {
         final bool isNewUser = result['is_new'] ?? false;
-        final String userId = result['user_id']?.toString() ?? '';
+
+        // 향후 여기에 result['access'] 토큰을 기기에 저장하는 로직이 들어갑니다.
+
+        // 신규 유저에게 반려견 등록(SignUpInfo1) 창을 넘기기 위해 임시 아이디 '1' 전달
+        final String userId = '1';
 
         if (isNewUser) {
-          // 신규 가입 유저 -> 프로필 등록으로 이동 (등록 완료 후 팝업 띄움)
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -121,7 +123,6 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          // 기존 유저 -> 팝업 없이 메인 쉘 홈으로 이동
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const MainShellScreen()),

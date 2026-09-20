@@ -23,8 +23,25 @@ class _SignUpState extends State<SignUp> {
   bool _isLoading = false;
   bool _isRequestingCode = false;
 
+  bool _isCodeSent = false;
+  bool _isCodeVerified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_onPasswordChanged);
+    _confirmPasswordController.addListener(_onPasswordChanged);
+  }
+
+  // 글자가 하나라도 바뀔 때마다 무한으로 화면을 새로고침하여 상태를 확인합니다.
+  void _onPasswordChanged() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _passwordController.removeListener(_onPasswordChanged);
+    _confirmPasswordController.removeListener(_onPasswordChanged);
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -36,7 +53,6 @@ class _SignUpState extends State<SignUp> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  // 팝업 함수
   void _showStyledDialog(String title, String subtitle) {
     showDialog(
       context: context,
@@ -131,7 +147,6 @@ class _SignUpState extends State<SignUp> {
     );
   }
 
-  // 1. 인증번호 받기 로직
   Future<void> _handleRequestAuthCode() async {
     final email = _emailController.text.trim();
 
@@ -148,12 +163,13 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isRequestingCode = true);
 
     try {
-      // TODO: 백엔드 API 연동 (인증번호 발송)
-      await Future.delayed(const Duration(seconds: 1)); // 통신 딜레이 모방
-
+      await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
 
-      setState(() => _isRequestingCode = false);
+      setState(() {
+        _isRequestingCode = false;
+        _isCodeSent = true;
+      });
     } catch (e) {
       setState(() => _isRequestingCode = false);
       if (!mounted) return;
@@ -161,12 +177,38 @@ class _SignUpState extends State<SignUp> {
     }
   }
 
-  // 2. 회원가입 진행 로직
+  Future<void> _handleVerifyAuthCode() async {
+    final code = _codeController.text.trim();
+
+    if (code.isEmpty) {
+      _showStyledDialog('입력 오류', '인증번호를 입력해주세요.');
+      return;
+    }
+
+    setState(() => _isRequestingCode = true);
+
+    try {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      setState(() => _isRequestingCode = false);
+
+      if (code == "1234") {
+        setState(() => _isCodeVerified = true);
+        _showStyledDialog('인증 성공', '인증번호가 확인되었습니다.');
+      } else {
+        _showStyledDialog('인증번호 불일치', '인증번호가 올바르지 않습니다.');
+      }
+    } catch (e) {
+      setState(() => _isRequestingCode = false);
+      if (!mounted) return;
+      _showStyledDialog('오류', '인증 확인 중\n오류가 발생했습니다.');
+    }
+  }
+
   Future<void> _handleSignUp() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
-    final code = _codeController.text.trim();
 
     if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       _showStyledDialog('입력 오류', '모든 필드를 입력해주세요.');
@@ -183,27 +225,21 @@ class _SignUpState extends State<SignUp> {
       return;
     }
 
-    if (code.isEmpty) {
-      _showStyledDialog('입력 오류', '인증번호를 입력해주세요.');
-      return;
-    }
-
-    // 💡 테스트용 인증번호 검증 (실제론 서버 통신으로 검증)
-    if (code != "1234") {
-      _showStyledDialog('인증번호가\n일치하지 않습니다', '다시 입력해주시겠어요');
+    if (!_isCodeVerified) {
+      _showStyledDialog('인증 필요', '이메일 인증을 먼저 완료해주세요.');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await ApiService.signUp(email, password, "");
+      final result = await ApiService.signUp(email, password, confirmPassword);
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (result['success'] == true) {
-        final String userId = result['user_id']?.toString() ?? '1';
+        final String userId = result['id']?.toString() ?? '1';
 
         Navigator.push(
           context,
@@ -221,6 +257,10 @@ class _SignUpState extends State<SignUp> {
 
   @override
   Widget build(BuildContext context) {
+    bool isPasswordMismatch =
+        _confirmPasswordController.text.isNotEmpty &&
+        _passwordController.text != _confirmPasswordController.text;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9E5),
       body: Stack(
@@ -254,7 +294,6 @@ class _SignUpState extends State<SignUp> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 228),
-
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Row(
@@ -274,7 +313,6 @@ class _SignUpState extends State<SignUp> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
                     Text(
                       'Sign Up',
                       style: GoogleFonts.inter(
@@ -284,28 +322,38 @@ class _SignUpState extends State<SignUp> {
                       ),
                     ),
                     const SizedBox(height: 30),
-
                     CustomTextField(
                       controller: _emailController,
                       hintText: 'E-mail',
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-
                     CustomTextField(
                       controller: _passwordController,
                       hintText: 'Password',
                       obscureText: true,
                     ),
                     const SizedBox(height: 12),
-
                     CustomTextField(
                       controller: _confirmPasswordController,
                       hintText: 'Confirm Password',
                       obscureText: true,
                     ),
-                    const SizedBox(height: 12),
 
+                    if (isPasswordMismatch)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6.0, left: 6.0),
+                        child: Text(
+                          '* 비밀번호가 일치하지 않습니다.',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -325,16 +373,23 @@ class _SignUpState extends State<SignUp> {
                                   ),
                                 )
                               : CustomButton(
-                                  text: '인증번호 받기',
-                                  onPressed: _handleRequestAuthCode,
+                                  text: _isCodeVerified
+                                      ? '인증 완료'
+                                      : (_isCodeSent ? '인증번호 확인' : '인증번호 받기'),
+                                  backgroundColor: _isCodeVerified
+                                      ? Colors.grey
+                                      : primaryGreen,
+                                  onPressed: _isCodeVerified
+                                      ? () {}
+                                      : (_isCodeSent
+                                            ? _handleVerifyAuthCode
+                                            : _handleRequestAuthCode),
                                   fontSize: 12.0,
                                 ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-
-                    // 회원가입 버튼
                     _isLoading
                         ? const Center(
                             child: CircularProgressIndicator(

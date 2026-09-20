@@ -327,7 +327,7 @@ class ApiService {
     }
   }
 
-  // [산책 시작 API] POST api/walks/start/
+  // [산책 시작 API]
   static Future<WalkData> startWalk({
     int? petId,
     bool isLocationShared = true,
@@ -369,7 +369,7 @@ class ApiService {
     }
   }
 
-  // [산책 종료 API] POST api/walks/:walk_id/end/
+  // [산책 종료 API]
   static Future<WalkReportData> endWalk(
     int walkId, {
     double? currentDistance,
@@ -410,14 +410,18 @@ class ApiService {
     }
   }
 
-  // [로그인 / 소셜 로그인 / 회원가입 / 비밀번호 API]
+  // [일반 로그인 API]
   static Future<Map<String, dynamic>> login(
     String email,
     String password,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'user_id': '1', 'message': '로그인 성공!'};
+      return {
+        'success': true,
+        'access': 'mock_access_token',
+        'refresh': 'mock_refresh_token',
+      };
     }
     try {
       final response = await http.post(
@@ -428,48 +432,55 @@ class ApiService {
       final data = jsonDecode(response.body);
       return {
         'success': response.statusCode == 200,
-        'user_id': data['user_id']?.toString(),
+        'access': data['access'],
+        'refresh': data['refresh'],
       };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 
+  // [소셜 로그인 API]
   static Future<Map<String, dynamic>> socialLogin(String provider) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
       return {
         'success': true,
-        'user_id': '1',
-        'is_new_user': false,
-        'message': '$provider 로그인 성공!',
+        'access': 'mock_access_token',
+        'refresh': 'mock_refresh_token',
+        'is_new': false, // UI 테스트용 (신규가입은 true)
       };
     }
     try {
+      String dummyAccessToken = "기기에서_추출한_실제_소셜토큰";
+
+      // 주소가 동적으로 변경되도록 세팅 (예: api/users/social/kakao/)
       final response = await http.post(
-        Uri.parse('$baseUrl/api/users/socaillogin'),
+        Uri.parse('$baseUrl/api/users/social/${provider.toLowerCase()}/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'provider': provider}),
+        body: jsonEncode({'access_token': dummyAccessToken}),
       );
       final data = jsonDecode(response.body);
       return {
         'success': response.statusCode == 200,
-        'user_id': data['user_id']?.toString(),
-        'is_new_user': data['is_new_user'] ?? false,
+        'access': data['access'],
+        'refresh': data['refresh'],
+        'is_new': data['is_new'] ?? false,
       };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 
+  // [회원가입 API]
   static Future<Map<String, dynamic>> signUp(
     String email,
     String password,
-    String nickname,
+    String passwordConfirm,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'user_id': '1'};
+      return {'success': true, 'id': 1};
     }
     try {
       final response = await http.post(
@@ -478,17 +489,20 @@ class ApiService {
         body: jsonEncode({
           'email': email,
           'password': password,
-          'nickname': nickname,
+          'password2': passwordConfirm,
         }),
       );
+      final data = jsonDecode(response.body);
       return {
         'success': response.statusCode == 200 || response.statusCode == 201,
+        'id': data['id'],
       };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 
+  // [프로필 수정 API]
   static Future<Map<String, dynamic>> updateUserProfile(
     String userId,
     String nickname,
@@ -506,46 +520,64 @@ class ApiService {
     }
   }
 
+  // [반려견 등록 API]
   static Future<Map<String, dynamic>> registerPet({
-    required String userId,
+    required String accessToken,
     required String name,
     required String breed,
     required String birthDate,
-    String? profileImage,
+    String? profileImagePath,
     List<String>? personalities,
   }) async {
     if (useMockData) return {'success': true};
     try {
-      final res = await http.post(
+      var request = http.MultipartRequest(
+        'POST',
         Uri.parse('$baseUrl/api/pets/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user': userId,
-          'name': name,
-          'breed': breed,
-          'birth_date': birthDate,
-          'profile_image': profileImage,
-          'personalities': personalities ?? [],
-        }),
       );
-      return {'success': res.statusCode == 200 || res.statusCode == 201};
+
+      // 헤더에 인증 토큰 담기
+      request.headers['Authorization'] = 'Bearer $accessToken';
+
+      request.fields['name'] = name;
+      request.fields['breed'] = breed;
+      request.fields['birth_date'] = birthDate;
+      if (personalities != null) {
+        request.fields['personalities'] = personalities.join(',');
+      }
+
+      if (profileImagePath != null && profileImagePath.isNotEmpty) {
+        request.files.add(
+          await http.MultipartFile.fromPath('profile_image', profileImagePath),
+        );
+      }
+
+      var response = await request.send();
+      return {
+        'success': response.statusCode == 200 || response.statusCode == 201,
+      };
     } catch (e) {
       return {'success': false};
     }
   }
 
+  // [비밀번호 변경 API]
   static Future<Map<String, dynamic>> resetPassword(
-    String currentPassword,
+    String accessToken,
     String newPassword,
+    String newPasswordConfirm,
   ) async {
     if (useMockData) return {'success': true};
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/users/password/reset/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
         body: jsonEncode({
-          'current_password': currentPassword,
           'new_password': newPassword,
+          'new_password_confirm': newPasswordConfirm,
         }),
       );
       return {'success': res.statusCode == 200};

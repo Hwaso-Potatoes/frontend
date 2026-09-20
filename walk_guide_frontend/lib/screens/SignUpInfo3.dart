@@ -65,11 +65,11 @@ class _SignUpInfo3State extends State<SignUpInfo3> {
       );
 
       final petRes = await ApiService.registerPet(
-        userId: widget.userId,
+        accessToken: 'mock_token', // 토큰 파라미터 추가! (실제 토큰 저장소 연동 전 임시값)
         name: widget.petName,
         breed: widget.breed,
         birthDate: widget.birthDate,
-        profileImage: widget.profileImage,
+        profileImagePath: widget.profileImage, // 변수명 일치
         personalities: _selectedPersonalities.toList(),
       );
 
