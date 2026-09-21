@@ -234,8 +234,8 @@ class WalkReportData {
 // [4. ApiService 메인 클래스]
 // -----------------------------------------------------------------------------
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8000';
-  static const bool useMockData = true;
+  static const String baseUrl = 'http://localhost';
+  static const bool useMockData = false;
 
   // [홈 화면 종합 데이터 로드]
   static Future<HomeDashboardResponse> getHomeDashboardData({
@@ -526,7 +526,12 @@ class ApiService {
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return {'success': true, 'id': 1};
+      return {
+        'success': true, 
+        'id': 1,
+        'access': 'mock_access_token',
+        'refresh': 'mock_refresh_token',
+      };
     }
     try {
       final response = await http.post(
@@ -543,6 +548,8 @@ class ApiService {
       return {
         'success': response.statusCode == 200 || response.statusCode == 201,
         'id': data['id'],
+        'access': data['access'],
+        'refresh': data['refresh'],
       };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
@@ -580,35 +587,60 @@ class ApiService {
     List<String>? personalities,
   }) async {
     if (useMockData) return {'success': true};
+
     try {
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/api/pets/'),
       );
 
-      // 헤더에 인증 토큰 담기
       request.headers['Authorization'] = 'Bearer $accessToken';
 
       request.fields['nickname'] = nickname;
       request.fields['name'] = name;
       request.fields['breed'] = breed;
       request.fields['birth_date'] = birthDate;
+
+      const personalityMap = {
+        '에너지형': 'energy',
+        '사회성형': 'social',
+        '겁쟁이형': 'timid',
+        '호기심형': 'curious',
+        '느긋형': 'relaxed',
+        '얌전형': 'calm',
+      };
+
       if (personalities != null) {
-        request.fields['personalities'] = personalities.join(',');
+        for (int i = 0; i < personalities.length; i++) {
+          final personalityValue =
+              personalityMap[personalities[i]] ?? personalities[i];
+
+          request.fields['personalities[$i]'] =
+              personalityValue;
+        }
       }
 
-      if (profileImagePath != null && profileImagePath.isNotEmpty) {
+      if (profileImagePath != null &&
+          profileImagePath.isNotEmpty) {
         request.files.add(
-          await http.MultipartFile.fromPath('profile_image', profileImagePath),
+          await http.MultipartFile.fromPath(
+            'profile_image',
+            profileImagePath,
+          ),
         );
       }
 
       var response = await request.send();
+
       return {
-        'success': response.statusCode == 200 || response.statusCode == 201,
+        'success':
+            response.statusCode == 200 ||
+            response.statusCode == 201,
       };
     } catch (e) {
-      return {'success': false};
+      return {
+        'success': false,
+      };
     }
   }
 

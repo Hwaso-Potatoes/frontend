@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
+
 import 'screens/login.dart';
 import 'screens/main_shell.dart';
-// 💡 언니 개발/테스트용 스크린 import 목록 (필요시 주석 해제)
-// import 'screens/profile_screen.dart';
-// import 'screens/mission_screen.dart';
-// import 'screens/report_screen.dart';
-// import 'screens/decorate_screen.dart';
-// import 'screens/accessory_box_screen.dart';
-// import 'models/accessory_box_model.dart';
 import 'screens/home.dart';
+import 'screens/findPWreset.dart';
+
 
 void main() {
   runApp(const WalkGuideApp());
 }
 
-// 앱 전체의 기본 설정(테마, 첫 화면 등)을 담당하는 최상위 클래스
+
 class WalkGuideApp extends StatelessWidget {
   const WalkGuideApp({super.key});
 
@@ -23,15 +19,43 @@ class WalkGuideApp extends StatelessWidget {
     return MaterialApp(
       title: 'Walk Guide',
       debugShowCheckedModeBanner: false,
+
       theme: ThemeData(
         primaryColor: const Color(0xFF27722F),
         scaffoldBackgroundColor: const Color(0xFFF8F9E5),
       ),
-      // 1. 기본 정상 진입 화면 (로그인 화면)
+
+      // 일반적으로 앱에 들어왔을 때
       home: const LoginPage(),
 
-      // 2. 언니가 단독 화면 테스트할 때 아래처럼 home을 교체해서 사용 가능:
-      //home: const MainShellScreen(),
+      // 비밀번호 재설정 이메일 링크로 들어왔을 때
+      onGenerateRoute: (settings) {
+        final uri = Uri.parse(settings.name ?? '/');
+
+        if (uri.path == '/reset-password') {
+          final uid = uri.queryParameters['uid'];
+          final token = uri.queryParameters['token'];
+
+          if (uid != null &&
+              uid.isNotEmpty &&
+              token != null &&
+              token.isNotEmpty) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (context) => FindPWReset(
+                uid: uid,
+                token: token,
+              ),
+            );
+          }
+
+          return MaterialPageRoute(
+            builder: (context) => const LoginPage(),
+          );
+        }
+
+        return null;
+      },
     );
   }
 }

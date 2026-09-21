@@ -144,12 +144,6 @@ class _FindPWState extends State<FindPW> {
 
       if (result['success'] == true) {
         _showStyledDialog('전송 완료', '비밀번호 재설정 링크가 포함된\n이메일을 발송했습니다.');
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pop(context); // 팝업 닫기
-            Navigator.pop(context); // 로그인 화면으로 돌아가기
-          }
-        });
       } else {
         _showStyledDialog('오류', '링크 전송에 실패했습니다.\n가입된 이메일인지 확인해주세요.');
       }

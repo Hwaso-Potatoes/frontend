@@ -254,33 +254,24 @@ class _SignUpState extends State<SignUp> {
       );
 
       if (signUpResult['success'] == true) {
-        // 2. 가입 성공 직후 자동으로 로그인 API를 호출하여 "진짜 토큰"을 발급받음
-        final loginResult = await ApiService.login(email, password);
         setState(() => _isLoading = false);
 
         if (!mounted) return;
 
-        if (loginResult['success'] == true) {
-          final String userId = signUpResult['id']?.toString() ?? '1';
-          final String accessToken = loginResult['access'] ?? 'mock_token';
+        final String userId =
+            signUpResult['id']?.toString() ?? '1';
 
-          // 발급받은 진짜 토큰을 다음 화면으로 넘겨줌
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  SignUpInfo1(userId: userId, accessToken: accessToken),
+        final String accessToken =
+            signUpResult['access'] ?? '';
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SignUpInfo1(
+              userId: userId,
+              accessToken: accessToken,
             ),
-          );
-        } else {
-          _showStyledDialog('안내', '가입은 완료되었으나 자동 로그인에 실패했습니다. 다시 로그인해주세요.');
-        }
-      } else {
-        setState(() => _isLoading = false);
-        if (!mounted) return;
-        _showStyledDialog(
-          '가입 실패',
-          signUpResult['message'] ?? '처리 중 오류가 발생했습니다.',
+          ),
         );
       }
     } catch (e) {
