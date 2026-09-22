@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
+// 구글/애플 패키지는 아직 세팅 전이므로 임시 주석 처리합니다.
+// import 'package:google_sign_in/google_sign_in.dart';
+// import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'SignUp.dart';
@@ -36,30 +41,11 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty) {
-      showCustomDialog(context: context, title: '안내', message: '이메일을 입력해주세요.');
-      return;
-    }
-
-    if (!_isValidEmail(email)) {
+    if (email.isEmpty || !_isValidEmail(email) || password.length < 6) {
       showCustomDialog(
         context: context,
-        title: '입력 오류',
-        message: '올바른 이메일 형식이 아닙니다.',
-      );
-      return;
-    }
-
-    if (password.isEmpty) {
-      showCustomDialog(context: context, title: '안내', message: '비밀번호를 입력해주세요.');
-      return;
-    }
-
-    if (password.length < 6) {
-      showCustomDialog(
-        context: context,
-        title: '입력 오류',
-        message: '비밀번호는 최소 6자리 이상이어야 합니다.',
+        title: '안내',
+        message: '올바른 이메일과 6자리 이상 비밀번호를 입력해주세요.',
       );
       return;
     }
@@ -73,8 +59,6 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        // 향후 여기에 result['access'] 토큰을 기기에 저장하는 로직이 들어갑니다.
-
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const MainShellScreen()),
@@ -84,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
         await showCustomDialog(
           context: context,
           title: '로그인 실패',
-          message: result['message'] ?? '이메일 또는 비밀번호를 확인해주세요.',
+          message: result['message'] ?? '정보를 확인해주세요.',
         );
       }
     } catch (e) {
@@ -100,17 +84,54 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleSocialLogin(String provider) async {
     setState(() => _isLoading = true);
+    String? realSocialToken;
 
     try {
-      final result = await ApiService.socialLogin(provider);
+      if (provider == 'KAKAO') {
+        if (await kakao.isKakaoTalkInstalled()) {
+          try {
+            final token = await kakao.UserApi.instance.loginWithKakaoTalk();
+            realSocialToken = token.accessToken;
+          } catch (error) {
+            final token = await kakao.UserApi.instance.loginWithKakaoAccount();
+            realSocialToken = token.accessToken;
+          }
+        } else {
+          final token = await kakao.UserApi.instance.loginWithKakaoAccount();
+          realSocialToken = token.accessToken;
+        }
+      } else if (provider == 'GOOGLE') {
+        // 구글 세팅 완료 후 주석 해제하여 작업합니다.
+        setState(() => _isLoading = false);
+        showCustomDialog(
+          context: context,
+          title: '안내',
+          message: '구글 로그인은 준비 중입니다.',
+        );
+        return;
+      } else if (provider == 'APPLE') {
+        // 애플 세팅 완료 후 주석 해제하여 작업합니다.
+        setState(() => _isLoading = false);
+        showCustomDialog(
+          context: context,
+          title: '안내',
+          message: '애플 로그인은 준비 중입니다.',
+        );
+        return;
+      }
+
+      if (realSocialToken == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final result = await ApiService.socialLogin(provider, realSocialToken);
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (result['success'] == true) {
         final bool isNewUser = result['is_new'] ?? false;
-
-        // 💡 소셜 로그인 성공 시 발급받은 토큰을 저장합니다.
         final String accessToken = result['access'] ?? 'mock_token';
         final String userId = result['user_id']?.toString() ?? '1';
 
@@ -132,17 +153,19 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         showCustomDialog(
           context: context,
-          title: '소셜 로그인 실패',
+          title: '로그인 실패',
           message: result['message'] ?? '$provider 로그인에 실패했습니다.',
         );
       }
     } catch (e) {
+      print('🚨🚨🚨 카카오 로그인 상세 에러 원인: $e 🚨🚨🚨');
+
       setState(() => _isLoading = false);
       if (!mounted) return;
       showCustomDialog(
         context: context,
         title: '오류',
-        message: '소셜 로그인 통신 중 오류가 발생했습니다.',
+        message: '소셜 로그인 진행 중 오류가 발생했습니다.',
       );
     }
   }
@@ -234,14 +257,12 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const FindPW(),
-                              ),
-                            );
-                          },
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FindPW(),
+                            ),
+                          ),
                           child: const Text(
                             '비밀번호 찾기',
                             style: TextStyle(
@@ -258,14 +279,12 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SignUp(),
-                              ),
-                            );
-                          },
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SignUp(),
+                            ),
+                          ),
                           child: const Text(
                             '회원가입',
                             style: TextStyle(

@@ -235,7 +235,7 @@ class WalkReportData {
 // -----------------------------------------------------------------------------
 class ApiService {
   static const String baseUrl = 'http://localhost';
-  static const bool useMockData = false;
+  static const bool useMockData = true;
 
   // [홈 화면 종합 데이터 로드]
   static Future<HomeDashboardResponse> getHomeDashboardData({
@@ -441,24 +441,21 @@ class ApiService {
   }
 
   // [소셜 로그인 API]
-  static Future<Map<String, dynamic>> socialLogin(String provider) async {
+  static Future<Map<String, dynamic>> socialLogin(String provider, String accessToken) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
       return {
         'success': true,
         'access': 'mock_access_token',
         'refresh': 'mock_refresh_token',
-        'is_new': false, // UI 테스트용 (신규가입은 true)
+        'is_new': false, // UI 테스트용
       };
     }
     try {
-      String dummyAccessToken = "기기에서_추출한_실제_소셜토큰";
-
-      // 주소가 동적으로 변경되도록 세팅 (예: api/users/social/kakao/)
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/social/${provider.toLowerCase()}/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'access_token': dummyAccessToken}),
+        body: jsonEncode({'access_token': accessToken}), 
       );
       final data = jsonDecode(response.body);
       return {
@@ -527,7 +524,7 @@ class ApiService {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
       return {
-        'success': true, 
+        'success': true,
         'id': 1,
         'access': 'mock_access_token',
         'refresh': 'mock_refresh_token',
@@ -615,32 +612,23 @@ class ApiService {
           final personalityValue =
               personalityMap[personalities[i]] ?? personalities[i];
 
-          request.fields['personalities[$i]'] =
-              personalityValue;
+          request.fields['personalities[$i]'] = personalityValue;
         }
       }
 
-      if (profileImagePath != null &&
-          profileImagePath.isNotEmpty) {
+      if (profileImagePath != null && profileImagePath.isNotEmpty) {
         request.files.add(
-          await http.MultipartFile.fromPath(
-            'profile_image',
-            profileImagePath,
-          ),
+          await http.MultipartFile.fromPath('profile_image', profileImagePath),
         );
       }
 
       var response = await request.send();
 
       return {
-        'success':
-            response.statusCode == 200 ||
-            response.statusCode == 201,
+        'success': response.statusCode == 200 || response.statusCode == 201,
       };
     } catch (e) {
-      return {
-        'success': false,
-      };
+      return {'success': false};
     }
   }
 
