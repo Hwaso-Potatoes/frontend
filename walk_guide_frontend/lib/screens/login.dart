@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
+import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
 // 구글/애플 패키지는 아직 세팅 전이므로 임시 주석 처리합니다.
 // import 'package:google_sign_in/google_sign_in.dart';
 // import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -88,17 +89,23 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       if (provider == 'KAKAO') {
-        if (await kakao.isKakaoTalkInstalled()) {
-          try {
-            final token = await kakao.UserApi.instance.loginWithKakaoTalk();
-            realSocialToken = token.accessToken;
-          } catch (error) {
+        if (kIsWeb) {
+          final token = await kakao.UserApi.instance.loginWithKakaoAccount();
+          realSocialToken = token.accessToken;
+        } else {
+          if (await kakao.isKakaoTalkInstalled()) {
+            try {
+              final token = await kakao.UserApi.instance.loginWithKakaoTalk();
+              realSocialToken = token.accessToken;
+            } catch (error) {
+              final token = await kakao.UserApi.instance
+                  .loginWithKakaoAccount();
+              realSocialToken = token.accessToken;
+            }
+          } else {
             final token = await kakao.UserApi.instance.loginWithKakaoAccount();
             realSocialToken = token.accessToken;
           }
-        } else {
-          final token = await kakao.UserApi.instance.loginWithKakaoAccount();
-          realSocialToken = token.accessToken;
         }
       } else if (provider == 'GOOGLE') {
         // 구글 세팅 완료 후 주석 해제하여 작업합니다.
