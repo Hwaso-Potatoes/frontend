@@ -26,7 +26,6 @@ class _SignUpState extends State<SignUp> {
   bool _isCodeSent = false;
   bool _isCodeVerified = false;
 
-  // 백엔드로부터 발급받은 인증 프리패스 토큰을 저장할 변수
   String _verificationToken = "";
 
   @override
@@ -56,10 +55,13 @@ class _SignUpState extends State<SignUp> {
   }
 
   void _showStyledDialog(String title, String subtitle) {
-    showDialog(
+    showGeneralDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.4),
-      builder: (context) {
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      transitionDuration: Duration.zero,
+      pageBuilder: (context, animation, secondaryAnimation) {
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28.0),
@@ -131,7 +133,7 @@ class _SignUpState extends State<SignUp> {
                 top: 16,
                 right: 16,
                 child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => Navigator.of(context, rootNavigator: true).pop(),
                   child: Container(
                     padding: const EdgeInsets.all(4.0),
                     child: const Icon(
@@ -245,7 +247,6 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. 회원가입 API 호출
       final signUpResult = await ApiService.signUp(
         email,
         password,
@@ -258,19 +259,14 @@ class _SignUpState extends State<SignUp> {
 
         if (!mounted) return;
 
-        final String userId =
-            signUpResult['id']?.toString() ?? '1';
-
-        final String accessToken =
-            signUpResult['access'] ?? '';
+        final String userId = signUpResult['id']?.toString() ?? '1';
+        final String accessToken = signUpResult['access'] ?? '';
 
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SignUpInfo1(
-              userId: userId,
-              accessToken: accessToken,
-            ),
+            builder: (context) =>
+                SignUpInfo1(userId: userId, accessToken: accessToken),
           ),
         );
       }

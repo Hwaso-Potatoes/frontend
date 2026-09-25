@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // 💡 kIsWeb(웹 환경 체크)을 사용하기 위해 추가되었습니다.
+import 'package:image_picker/image_picker.dart';
 import '../widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'SignUpInfo3.dart';
@@ -25,16 +28,50 @@ class SignUpInfo2 extends StatefulWidget {
 
 class _SignUpInfo2State extends State<SignUpInfo2> {
   final TextEditingController _petNameController = TextEditingController();
-  final TextEditingController _breedController = TextEditingController();
 
-  DateTime _selectedDate = DateTime.now();
+  final ImagePicker _picker = ImagePicker();
   String? _profileImagePath;
+  String? _selectedBreed;
+  DateTime _selectedDate = DateTime.now();
+
+  final List<String> _dogBreeds = [
+    '슈나우저',
+    '이탈리안 그레이하운드',
+    '시바견',
+    '비글',
+    '웰시코기',
+    '비숑',
+    '사모예드',
+    '푸들',
+    '골든 리트리버',
+    '포메라니안',
+    '프렌치 불독',
+    '치와와',
+    '퍼그',
+    '말티즈',
+    '닥스훈트',
+    '시베리안 허스키',
+    '도베르만',
+    '시추',
+  ];
 
   @override
   void dispose() {
     _petNameController.dispose();
-    _breedController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _profileImagePath = image.path;
+        });
+      }
+    } catch (e) {
+      debugPrint('이미지 선택 오류: $e');
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -66,7 +103,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
 
   void _nextStep() {
     final petName = _petNameController.text.trim();
-    final breed = _breedController.text.trim();
 
     if (petName.isEmpty) {
       showCustomDialog(
@@ -74,6 +110,11 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
         title: '안내',
         message: '강아지 이름을 입력해주세요.',
       );
+      return;
+    }
+
+    if (_selectedBreed == null) {
+      showCustomDialog(context: context, title: '안내', message: '견종을 선택해주세요.');
       return;
     }
 
@@ -89,7 +130,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
           userId: widget.userId,
           nickname: widget.nickname,
           petName: petName,
-          breed: breed.isEmpty ? '미정' : breed,
+          breed: _selectedBreed ?? '미정',
           birthDate: birthDate,
           profileImage: _profileImagePath,
           accessToken: widget.accessToken,
@@ -116,7 +157,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. 상단바
             Padding(
               padding: const EdgeInsets.only(top: 79.0),
               child: SizedBox(
@@ -153,7 +193,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
               ),
             ),
             const SizedBox(height: 30),
-            // 3. 본문 영역
             Expanded(
               child: SingleChildScrollView(
                 child: Padding(
@@ -161,7 +200,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 진행 바 (0.33 -> 0.66)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: TweenAnimationBuilder<double>(
@@ -190,58 +228,77 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // 프로필 사진 등록
                       Center(
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFEFF3C8),
-                                border: Border.all(color: Colors.black12),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(
-                                    Icons.camera_alt_outlined,
-                                    size: 32,
-                                    color: Colors.black54,
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '사진 등록',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
+                                  color: const Color(0xFFEFF3C8),
+                                  border: Border.all(color: Colors.black12),
                                 ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  size: 14,
-                                  color: Colors.white,
+                                // 💡 변경점: 웹(Chrome)과 앱을 분리하여 이미지를 다르게 불러옵니다.
+                                child: _profileImagePath != null
+                                    ? ClipOval(
+                                        child: kIsWeb
+                                            ? Image.network(
+                                                _profileImagePath!,
+                                                fit: BoxFit.cover,
+                                                width: 100,
+                                                height: 100,
+                                              )
+                                            : Image.file(
+                                                File(_profileImagePath!),
+                                                fit: BoxFit.cover,
+                                                width: 100,
+                                                height: 100,
+                                              ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: const [
+                                          Icon(
+                                            Icons.camera_alt_outlined,
+                                            size: 32,
+                                            color: Colors.black54,
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            '사진 등록',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // 강아지 이름
                       const Text(
                         '강아지 이름',
                         style: TextStyle(
@@ -256,7 +313,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         hintText: '이름을 입력해 주세요',
                       ),
                       const SizedBox(height: 16),
-                      // 견종 선택
                       const Text(
                         '견종 선택',
                         style: TextStyle(
@@ -266,12 +322,52 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      CustomTextField(
-                        controller: _breedController,
-                        hintText: '견종을 검색해주세요',
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15.0),
+                          border: Border.all(
+                            color: const Color(0xFFC8E6C9),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedBreed,
+                            hint: const Text(
+                              '견종을 선택해주세요',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black38,
+                              ),
+                            ),
+                            isExpanded: true,
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.black38,
+                            ),
+                            items: _dogBreeds.map((String breed) {
+                              return DropdownMenuItem<String>(
+                                value: breed,
+                                child: Text(
+                                  breed,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                _selectedBreed = newValue;
+                              });
+                            },
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      // 생년월일
                       const Text(
                         '생년월일',
                         style: TextStyle(

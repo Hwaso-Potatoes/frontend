@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
 import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
-// 구글/애플 패키지는 아직 세팅 전이므로 임시 주석 처리합니다.
-// import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+//애플 패키지는 당장 사용하지 않으므로 임시 주석 처리
 // import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../widgets/custom_widgets.dart';
@@ -108,7 +109,32 @@ class _LoginPageState extends State<LoginPage> {
           }
         }
       } else if (provider == 'GOOGLE') {
-        // 구글 세팅 완료 후 주석 해제하여 작업합니다.
+        /*final GoogleSignIn googleSignIn = GoogleSignIn(
+          clientId: kIsWeb ? '여기에_웹_클라이언트_ID를_넣어야_합니다' : null,
+        );
+
+        try {
+          final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+          if (googleUser != null) {
+            final GoogleSignInAuthentication googleAuth =
+                await googleUser.authentication;
+            realSocialToken = googleAuth.accessToken ?? 'mock_google_token';
+          } else {
+            setState(() => _isLoading = false);
+            return;
+          }
+        } catch (error) {
+          print('🚨 구글 로그인 에러: $error');
+          setState(() => _isLoading = false);
+          if (!mounted) return;
+          showCustomDialog(
+            context: context,
+            title: '오류',
+            message: '구글 로그인 중 오류가 발생했습니다.',
+          );
+          return;
+        }*/
         setState(() => _isLoading = false);
         showCustomDialog(
           context: context,
@@ -117,7 +143,41 @@ class _LoginPageState extends State<LoginPage> {
         );
         return;
       } else if (provider == 'APPLE') {
-        // 애플 세팅 완료 후 주석 해제하여 작업합니다.
+        // 애플 로그인은 추후 도입을 위해 코드를 유지한 채 주석 처리합니다.
+        /*
+        try {
+          final credential = await SignInWithApple.getAppleIDCredential(
+            scopes: [
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+            webAuthenticationOptions: kIsWeb
+                ? WebAuthenticationOptions(
+                    clientId: '여기에_애플_Service_ID를_넣어야_합니다',
+                    redirectUri: Uri.parse('여기에_리다이렉트_URL을_넣어야_합니다'),
+                  )
+                : null,
+          );
+
+          realSocialToken = credential.identityToken;
+
+          if (realSocialToken == null) {
+            setState(() => _isLoading = false);
+            return;
+          }
+        } catch (error) {
+          print('🚨 애플 로그인 에러: $error');
+          setState(() => _isLoading = false);
+          if (!mounted) return;
+          showCustomDialog(
+            context: context,
+            title: '오류',
+            message: '애플 로그인 중 오류가 발생했습니다.',
+          );
+          return;
+        }
+        */
+
         setState(() => _isLoading = false);
         showCustomDialog(
           context: context,
