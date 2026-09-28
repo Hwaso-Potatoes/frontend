@@ -109,8 +109,10 @@ class _LoginPageState extends State<LoginPage> {
           }
         }
       } else if (provider == 'GOOGLE') {
-        /*final GoogleSignIn googleSignIn = GoogleSignIn(
-          clientId: kIsWeb ? '여기에_웹_클라이언트_ID를_넣어야_합니다' : null,
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          clientId: kIsWeb
+              ? '383803308526-2sm4i2332oh1m6skmde6gp2g5digth9e.apps.googleusercontent.com'
+              : null,
         );
 
         try {
@@ -119,7 +121,11 @@ class _LoginPageState extends State<LoginPage> {
           if (googleUser != null) {
             final GoogleSignInAuthentication googleAuth =
                 await googleUser.authentication;
-            realSocialToken = googleAuth.accessToken ?? 'mock_google_token';
+
+            realSocialToken =
+                googleAuth.idToken ??
+                googleAuth.accessToken ??
+                'mock_google_token';
           } else {
             setState(() => _isLoading = false);
             return;
@@ -134,14 +140,7 @@ class _LoginPageState extends State<LoginPage> {
             message: '구글 로그인 중 오류가 발생했습니다.',
           );
           return;
-        }*/
-        setState(() => _isLoading = false);
-        showCustomDialog(
-          context: context,
-          title: '안내',
-          message: '구글 로그인은 준비 중입니다.',
-        );
-        return;
+        }
       } else if (provider == 'APPLE') {
         // 애플 로그인은 추후 도입을 위해 코드를 유지한 채 주석 처리합니다.
         /*
