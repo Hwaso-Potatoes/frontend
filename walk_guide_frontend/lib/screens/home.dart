@@ -5,8 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'walk_tracking.dart';
-import 'mission_screen.dart';
 import 'decorate_screen.dart';
+import 'attendance_screen.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -45,23 +45,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showPermissionDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.4),
+      barrierColor: Colors.black.withOpacity(0.4),
       barrierDismissible: false,
       builder: (context) => const PermissionDialog(),
-    );
-  }
-
-  void _navigateToWalkTracking() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const WalkTrackingScreen()),
-    );
-  }
-
-  void _navigateToMissionScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MissionScreen()),
     );
   }
 
@@ -69,6 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DecorationScreen()),
+    );
+  }
+
+  void _handleAttendanceTap() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AttendanceScreen()),
     );
   }
 
@@ -92,9 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     '데이터를 불러오지 못했습니다.',
-                    style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.5),
-                    ),
+                    style: TextStyle(color: Colors.black.withOpacity(0.5)),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
@@ -121,93 +112,56 @@ class _HomeScreenState extends State<HomeScreen> {
           return Container(
             color: backgroundColor,
             child: SingleChildScrollView(
-              child: Stack(
-                clipBehavior: Clip.none,
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTopHeroSection(
-                        data.userName,
-                        data.petImageUrl,
-                        data.petBreed,
-                      ),
-                      Transform.translate(
-                        offset: const Offset(0, -30),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: backgroundColor,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(32),
-                              topRight: Radius.circular(32),
-                            ),
-                          ),
-                          padding: const EdgeInsets.only(
-                            left: 24,
-                            right: 24,
-                            top: 24,
-                            bottom: 60,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildPetProfileHeader(data),
-                              const SizedBox(height: 20),
-                              _buildWalkProgressCard(
-                                data,
-                                walkRatio,
-                                walkPercentage,
-                              ),
-                              const SizedBox(height: 28),
-                              _buildWalkingFriendsSection(data.walkingFriends),
-                              const SizedBox(height: 28),
-                              _buildDailyMissionsSection(data.dailyMissions),
-                              const SizedBox(height: 28),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  _buildTopHeroSection(
+                    data.userName,
+                    data.petImageUrl,
+                    data.petBreed,
                   ),
-
-                  // 우측 배경 나무 SVG
-                  Positioned(
-                    top: 270,
-                    right: 20,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Transform.translate(
-                          offset: const Offset(0, 1),
-                          child: ImageFiltered(
-                            imageFilter: ImageFilter.blur(
-                              sigmaX: 1.0,
-                              sigmaY: 4.0,
-                            ),
-                            child: SvgPicture.asset(
-                              'assets/images/trees1.svg',
-                              width: 125,
-                              height: 135,
-                              fit: BoxFit.contain,
-                              colorFilter: ColorFilter.mode(
-                                Colors.black.withValues(alpha: 0.35),
-                                BlendMode.srcIn,
-                              ),
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const SizedBox.shrink(),
-                            ),
+                  Transform.translate(
+                    offset: const Offset(0, -35),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(32),
+                          topRight: Radius.circular(32),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
                           ),
-                        ),
-                        SvgPicture.asset(
-                          'assets/images/trees1.svg',
-                          width: 125,
-                          height: 135,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const SizedBox.shrink(),
-                        ),
-                      ],
+                        ],
+                      ),
+                      padding: const EdgeInsets.only(
+                        left: 24,
+                        right: 24,
+                        top: 24,
+                        bottom: 60,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPetProfileHeader(data),
+                          const SizedBox(height: 16),
+                          _buildWalkProgressCard(
+                            data,
+                            walkRatio,
+                            walkPercentage,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildWalkingFriendsSection(data.walkingFriends),
+                          const SizedBox(height: 16),
+                          _buildAttendanceBanner(),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -239,6 +193,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(color: const Color(0xFFF1F3D8)),
             ),
           ),
+          Positioned(
+            right: 20,
+            bottom: 75,
+            child: SvgPicture.asset(
+              'assets/images/trees1.svg',
+              width: 125,
+              height: 135,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  const SizedBox.shrink(),
+            ),
+          ),
           Positioned.fill(
             child: Align(
               alignment: Alignment.bottomCenter,
@@ -257,9 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 180,
                           height: 18,
                           decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF636037,
-                            ).withValues(alpha: 0.28),
+                            color: const Color(0xFF636037).withOpacity(0.28),
                             borderRadius: const BorderRadius.all(
                               Radius.elliptical(135, 14),
                             ),
@@ -322,10 +286,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             '꾸미러가기',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w300,
+                              fontWeight: FontWeight.w500,
                               color: Color(0xFF676543),
                             ),
                           ),
+                          SizedBox(width: 2),
                           Icon(
                             Icons.chevron_right,
                             size: 16,
@@ -446,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              '${data.petBreed} · ${data.petAge}세',
+              '${data.petBreed} . ${data.petAge}세',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -460,8 +425,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               'Lv.${data.petLevel}',
-              style: const TextStyle(
-                fontSize: 20,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: Colors.black,
               ),
@@ -586,27 +551,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '지금 산책 중인 친구',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Colors.black,
-              ),
-            ),
-            if (friends.isNotEmpty)
-              Text(
-                '${friends.length}마리 산책 중',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF72AA4F),
-                ),
-              ),
-          ],
+        Text(
+          '지금 산책 중인 친구',
+          style: GoogleFonts.notoSansKr(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Colors.black,
+          ),
         ),
         const SizedBox(height: 14),
         if (friends.isEmpty)
@@ -639,8 +590,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       width: 64,
                       height: 64,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE9F0D8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFA9AA80).withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
                       child: ClipOval(
@@ -672,248 +623,121 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDailyMissionsSection(List<PetMissionItem> missions) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // 출석 체크 배너 UI (2번 사진 시안과 완벽 일치)
+  Widget _buildAttendanceBanner() {
+    return GestureDetector(
+      onTap: _handleAttendanceTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE5F1CD),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
           children: [
-            Text(
-              '오늘의 미션',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Colors.black,
+            Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: Color(0xFFB4D58B),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.card_giftcard,
+                color: Color(0xFF4B6B2B),
+                size: 24,
               ),
             ),
-            GestureDetector(
-              onTap: _navigateToMissionScreen,
-              child: const Text(
-                '더보기',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black45,
+            const SizedBox(width: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '오늘의 출석선물이 도착했어요!',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF2E4416),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  '클릭하여 자세히 보세요',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF6B8A46),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        if (missions.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEBEFDA),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Text(
-                '오늘 등록된 미션이 없습니다.',
-                style: TextStyle(fontSize: 13, color: Colors.black45),
-              ),
-            ),
-          )
-        else
-          ...missions.map((mission) {
-            final isCompleted =
-                mission.status == 'CLAIMED' || mission.status == 'CLAIMABLE';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10.0),
-              child: _buildMissionItem(
-                leading: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? const Color(0xFF90C271)
-                        : const Color(0xFFDDEBC8),
-                    shape: BoxShape.circle,
-                  ),
-                  child: isCompleted
-                      ? const Icon(Icons.check, color: Colors.white, size: 18)
-                      : Center(
-                          child: Text(
-                            '${mission.requiredCount}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Color(0xFF496B31),
-                            ),
-                          ),
-                        ),
-                ),
-                title: mission.title,
-                subtitle: isCompleted
-                    ? '+ ${mission.rewardExperience} XP'
-                    : '${mission.currentValue} / ${mission.requiredCount} 완료',
-              ),
-            );
-          }),
-      ],
-    );
-  }
-
-  Widget _buildMissionItem({
-    required Widget leading,
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEBEFDA),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          leading,
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black45,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 }
 
-// 권한 팝업창
+// -----------------------------------------------------------------------------
+// [권한 안내 팝업 위젯 (PermissionDialog)]
+// -----------------------------------------------------------------------------
 class PermissionDialog extends StatelessWidget {
   const PermissionDialog({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24.0),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '더 편리한 서비스 이용을 위한\n접근 권한을 안내드립니다.',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  height: 1.4,
-                  color: Colors.black,
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on, size: 48, color: primaryGreen),
+            const SizedBox(height: 16),
+            Text(
+              '위치 권한 안내',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '산책 경로 기록 및 근처 친구 확인을 위해 위치 서비스 권한이 필요합니다.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreen,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(height: 32),
-              _buildPermissionItem(
-                icon: Icons.location_on_outlined,
-                title: '위치 정보',
-                isOptional: true,
-                description: '산책 경로 기록과 근처 친구 확인',
-              ),
-              const SizedBox(height: 24),
-              _buildPermissionItem(
-                icon: Icons.notifications_none_outlined,
-                title: '알림',
-                isOptional: true,
-                description: '산책 리마인더와 주간 리포트 알림',
-              ),
-              const SizedBox(height: 40),
-              CustomButton(
-                text: '확인',
-                backgroundColor: const Color(0xFF496B31),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPermissionItem({
-    required IconData icon,
-    required String title,
-    required bool isOptional,
-    required String description,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFA5D179), width: 1.5),
-          ),
-          child: Icon(icon, color: const Color(0xFFA5D179), size: 22),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  if (isOptional) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '(선택)',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black45,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 12,
-                  color: Colors.black45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

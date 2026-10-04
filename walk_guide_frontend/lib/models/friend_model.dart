@@ -24,11 +24,7 @@ class FriendPet {
   final String name;
   final String breed;
 
-  const FriendPet({
-    required this.id,
-    required this.name,
-    required this.breed,
-  });
+  const FriendPet({required this.id, required this.name, required this.breed});
 
   factory FriendPet.fromJson(Map<String, dynamic> json) {
     return FriendPet(
@@ -137,35 +133,35 @@ Future<List<Friend>> mockFetchMyFriends() async {
       'id': 1,
       'nickname': '토리보호자',
       'pets': [
-        {'id': 1, 'name': '토리', 'breed': '포메라니안'}
+        {'id': 1, 'name': '토리', 'breed': '포메라니안'},
       ],
     },
     {
       'id': 2,
       'nickname': '밀크보호자',
       'pets': [
-        {'id': 2, 'name': '밀크', 'breed': '말티즈'}
+        {'id': 2, 'name': '밀크', 'breed': '말티즈'},
       ],
     },
     {
       'id': 3,
       'nickname': '휴지보호자',
       'pets': [
-        {'id': 3, 'name': '휴지', 'breed': '푸들'}
+        {'id': 3, 'name': '휴지', 'breed': '푸들'},
       ],
     },
     {
       'id': 4,
       'nickname': '초코보호자',
       'pets': [
-        {'id': 4, 'name': '초코', 'breed': '닥스훈트'}
+        {'id': 4, 'name': '초코', 'breed': '닥스훈트'},
       ],
     },
     {
       'id': 5,
       'nickname': '뭉치보호자',
       'pets': [
-        {'id': 5, 'name': '뭉치', 'breed': '사모예드'}
+        {'id': 5, 'name': '뭉치', 'breed': '사모예드'},
       ],
     },
   ];
@@ -203,10 +199,7 @@ Future<List<FriendSearchResult>> mockSearchFriends(String query) async {
     const FriendSearchResult(id: 15, nickname: '몽이보호자'),
   ];
 
-  return mockUsers
-      .where((u) => u.nickname.contains(query))
-      .take(5)
-      .toList();
+  return mockUsers.where((u) => u.nickname.contains(query)).take(5).toList();
 }
 
 /// POST api/friends/ (receiver_id) 를 흉내낸 mock. 201 -> { "id": N } 형태.
@@ -239,4 +232,55 @@ Future<void> mockAcceptFriendRequest(int requestId) async {
 /// POST api/friends/requests/:request_id/reject/ 를 흉내낸 mock. 204.
 Future<void> mockRejectFriendRequest(int requestId) async {
   await Future.delayed(const Duration(milliseconds: 200));
+}
+
+/// POST api/friends/qr/ 응답 모델 (나의 QR 생성)
+class QrCodeGenerateResponse {
+  final String token;
+  final int expiresIn;
+
+  const QrCodeGenerateResponse({required this.token, required this.expiresIn});
+
+  factory QrCodeGenerateResponse.fromJson(Map<String, dynamic> json) {
+    return QrCodeGenerateResponse(
+      token:
+          json['token'] as String? ??
+          'matqO3cQVFZ2Hxge5ZU25JT4Kj4ud0G63jDbRd7LjAg',
+      expiresIn: json['expires_in'] as int? ?? 300,
+    );
+  }
+}
+
+/// POST api/friends/qr/ (나의 QR 생성) mock
+Future<QrCodeGenerateResponse> mockGenerateMyQrCode() async {
+  await Future.delayed(const Duration(milliseconds: 250));
+  final randomToken = List.generate(
+    40,
+    (index) =>
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Random()
+            .nextInt(62)],
+  ).join();
+  return QrCodeGenerateResponse(token: randomToken, expiresIn: 300);
+}
+
+/// POST api/friends/qr/redeem/ (QR 스캔 후 친구 추가) mock
+Future<Friend> mockRedeemQrCode(String token) async {
+  await Future.delayed(const Duration(milliseconds: 300));
+  if (token.trim().isEmpty) {
+    throw Exception('유효하지 않은 QR 토큰입니다.');
+  }
+
+  final mockFriendJson = {
+    'id': Random().nextInt(100) + 10,
+    'nickname': '은비보호자',
+    'pets': [
+      {'id': 4, 'name': '뭉치', 'breed': '사모예드'},
+    ],
+  };
+
+  final friend = Friend.fromJson(mockFriendJson);
+  return friend.copyWith(
+    isWalkingNow: true,
+    walkStatusText: '오프라인 QR 코드로 친구 추가됨',
+  );
 }

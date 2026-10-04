@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
+import '../models/friend_model.dart';
 
 // -----------------------------------------------------------------------------
 // [1. 홈 화면 대시보드 모델]
@@ -410,6 +412,143 @@ class ApiService {
     }
   }
 
+  // [산책 중 위치 공유 토글 API (PATCH api/walks/:walk_id/location-share/)]
+  static Future<Map<String, dynamic>> updateLocationShareStatus(
+    int walkId,
+    bool isLocationShared, {
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      return {
+        'message': isLocationShared ? '위치 공유가 켜졌습니다.' : '위치 공유가 꺼졌습니다.',
+        'data': {
+          'walk_id': walkId,
+          'is_location_shared': isLocationShared,
+          'changed': true,
+        },
+      };
+    }
+
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/walks/$walkId/location-share/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'is_location_shared': isLocationShared}),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return jsonDecode(res.body);
+      }
+      throw Exception('위치 공유 토글 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [산책 중 상태 변경 API (PATCH api/walks/:walk_id/)] - "WALKING", "PAUSED", "FINISHED"
+  static Future<Map<String, dynamic>> updateWalkStatus(
+    int walkId,
+    String status, {
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      return {
+        'message': '산책 상태가 변경되었습니다.',
+        'data': {'id': walkId, 'status': status, 'changed': true},
+      };
+    }
+
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/walks/$walkId/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'status': status}),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return jsonDecode(res.body);
+      }
+      throw Exception('산책 상태 변경 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [산책 경로 위치 저장 API (POST api/walks/:walk_id/locations/)]
+  static Future<Map<String, dynamic>> recordWalkLocation(
+    int walkId,
+    double latitude,
+    double longitude, {
+    String? token,
+  }) async {
+    if (useMockData) {
+      return {
+        'message': '1개의 위치 정보가 추가되었습니다.',
+        'current_total_distance_km': 0.02,
+      };
+    }
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/walks/$walkId/locations/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return jsonDecode(res.body);
+      }
+      throw Exception('위치 저장 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [산책 상세 조회 API (GET api/walks/:walk_id/)]
+  static Future<Map<String, dynamic>> getWalkDetails(
+    int walkId, {
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      return {
+        'id': walkId,
+        'user': 1,
+        'status': 'WALKING',
+        'is_location_shared': true,
+        'total_distance': 1.8,
+        'total_duration': 1945,
+        'total_paused_seconds': 0,
+        'paused_time_str': '0초',
+        'total_duration_str': '32분 25초',
+      };
+    }
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/walks/$walkId/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      throw Exception('산책 상세 정보 조회 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
   // [일반 로그인 API]
   static Future<Map<String, dynamic>> login(
     String email,
@@ -441,7 +580,10 @@ class ApiService {
   }
 
   // [소셜 로그인 API]
-  static Future<Map<String, dynamic>> socialLogin(String provider, String accessToken) async {
+  static Future<Map<String, dynamic>> socialLogin(
+    String provider,
+    String accessToken,
+  ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
       return {
@@ -455,7 +597,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/social/${provider.toLowerCase()}/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'access_token': accessToken}), 
+        body: jsonEncode({'access_token': accessToken}),
       );
       final data = jsonDecode(response.body);
       return {
@@ -658,5 +800,472 @@ class ApiService {
     } catch (e) {
       return {'success': false};
     }
+  }
+
+  // -----------------------------------------------------------------------------
+  // [출석 체크 관련 API 엔드포인트]
+  // -----------------------------------------------------------------------------
+
+  // 1. GET api/attendance/summary/ (출석 요약 및 보상 수령 여부)
+  static Future<AttendanceSummaryResponse> getAttendanceSummary({
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return AttendanceSummaryResponse(
+        currentStreak: 1,
+        bestStreak: 1,
+        today: AttendanceTodayItem(
+          date: '2026-10-05',
+          attended: true,
+          isRewardDay: true,
+          reward: AttendanceRewardItem(
+            id: 1,
+            attendanceDate: '2026-10-05',
+            opened: false,
+            openedAt: null,
+            accessory: null,
+          ),
+        ),
+        week: [
+          AttendanceDayItem(
+            date: '2026-09-28',
+            attended: true,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-09-29',
+            attended: true,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-09-30',
+            attended: true,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-10-01',
+            attended: false,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-10-02',
+            attended: false,
+            isRewardDay: true,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-10-03',
+            attended: false,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+          AttendanceDayItem(
+            date: '2026-10-04',
+            attended: false,
+            isRewardDay: false,
+            rewardReceived: false,
+          ),
+        ],
+      );
+    }
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/attendance/summary/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        return AttendanceSummaryResponse.fromJson(jsonDecode(res.body));
+      }
+      throw Exception('출석 요약 조회 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // 2. GET api/attendance/calendar/?year=year&month=month (월간 출석 달력)
+  static Future<AttendanceCalendarResponse> getAttendanceCalendar({
+    required int year,
+    required int month,
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      final List<int> attendedDaysList = [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+      ];
+      final daysInMonth = DateTime(year, month + 1, 0).day;
+      final days = List.generate(daysInMonth, (i) {
+        final day = i + 1;
+        final dateStr =
+            '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+        final isAttended = attendedDaysList.contains(day);
+        return AttendanceDayItem(
+          date: dateStr,
+          attended: isAttended,
+          isRewardDay: day == 5 || day == 12 || day == 19 || day == 26,
+          rewardReceived: isAttended && (day == 5 || day == 12 || day == 19),
+        );
+      });
+      return AttendanceCalendarResponse(year: year, month: month, days: days);
+    }
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/attendance/calendar/?year=$year&month=$month'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        return AttendanceCalendarResponse.fromJson(jsonDecode(res.body));
+      }
+      throw Exception('출석 달력 조회 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // 3. GET api/attendance/rewards/ (보상 목록)
+  static Future<List<AttendanceRewardItem>> getAttendanceRewards({
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      return [
+        AttendanceRewardItem(
+          id: 101,
+          attendanceDate: '2026-10-01',
+          opened: true,
+          openedAt: '2026-10-01T10:00:00+09:00',
+          accessory: AttendanceAccessoryItem(
+            id: 1,
+            name: '넥타이 케이프',
+            image: null,
+            category: 'CAPE',
+          ),
+        ),
+        AttendanceRewardItem(
+          id: 102,
+          attendanceDate: '2026-09-30',
+          opened: true,
+          openedAt: '2026-09-30T10:00:00+09:00',
+          accessory: AttendanceAccessoryItem(
+            id: 2,
+            name: '하트 핀',
+            image: null,
+            category: 'PIN',
+          ),
+        ),
+        AttendanceRewardItem(
+          id: 103,
+          attendanceDate: '2026-09-29',
+          opened: true,
+          openedAt: '2026-09-29T10:00:00+09:00',
+          accessory: AttendanceAccessoryItem(
+            id: 3,
+            name: '왕관',
+            image: null,
+            category: 'CROWN',
+          ),
+        ),
+      ];
+    }
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/attendance/rewards/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        final List list = jsonDecode(res.body);
+        return list.map((item) => AttendanceRewardItem.fromJson(item)).toList();
+      }
+      throw Exception('보상 목록 조회 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // 4. PATCH api/attendance/rewards/:reward_id/open/ (출석 보상 수령)
+  static Future<AttendanceRewardItem> openAttendanceReward(
+    int rewardId, {
+    String? token,
+  }) async {
+    if (useMockData) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return AttendanceRewardItem(
+        id: rewardId,
+        attendanceDate: '2026-10-05',
+        opened: true,
+        openedAt: DateTime.now().toIso8601String(),
+        accessory: AttendanceAccessoryItem(
+          id: 13,
+          name: '하트 핀',
+          image: 'http://localhost/media/accessories/IMG_2642_1.png',
+          category: 'HAIR',
+        ),
+      );
+    }
+
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/attendance/rewards/$rewardId/open/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return AttendanceRewardItem.fromJson(jsonDecode(res.body));
+      }
+      throw Exception('보상 수령 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [POST api/friends/qr/ - 나의 QR 생성 API]
+  static Future<QrCodeGenerateResponse> generateMyQrCode({
+    String? token,
+  }) async {
+    if (useMockData) {
+      return mockGenerateMyQrCode();
+    }
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/friends/qr/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return QrCodeGenerateResponse.fromJson(jsonDecode(res.body));
+      }
+      throw Exception('QR 코드 생성 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [POST api/friends/qr/redeem/ - QR 스캔 후 친구 추가 API]
+  static Future<Friend> redeemQrCode(String qrToken, {String? token}) async {
+    if (useMockData) {
+      return mockRedeemQrCode(qrToken);
+    }
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/friends/qr/redeem/'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'token': qrToken}),
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final data = jsonDecode(res.body);
+        final friendJson = data['friend'] ?? data;
+        return Friend.fromJson(friendJson);
+      }
+      throw Exception('친구 추가 실패');
+    } catch (e) {
+      throw Exception('서버 연결 실패: $e');
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// [5. 출석 관련 모델 데이터 클래스]
+// -----------------------------------------------------------------------------
+class AttendanceAccessoryItem {
+  final int id;
+  final String name;
+  final String? image;
+  final String? category;
+
+  AttendanceAccessoryItem({
+    required this.id,
+    required this.name,
+    this.image,
+    this.category,
+  });
+
+  factory AttendanceAccessoryItem.fromJson(Map<String, dynamic> json) {
+    return AttendanceAccessoryItem(
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      name: json['name']?.toString() ?? '',
+      image: json['image']?.toString(),
+      category: json['category']?.toString(),
+    );
+  }
+}
+
+class AttendanceRewardItem {
+  final int id;
+  final String attendanceDate;
+  final bool opened;
+  final String? openedAt;
+  final AttendanceAccessoryItem? accessory;
+
+  AttendanceRewardItem({
+    required this.id,
+    required this.attendanceDate,
+    required this.opened,
+    this.openedAt,
+    this.accessory,
+  });
+
+  factory AttendanceRewardItem.fromJson(Map<String, dynamic> json) {
+    return AttendanceRewardItem(
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      attendanceDate: json['attendance_date']?.toString() ?? '',
+      opened: json['opened'] ?? false,
+      openedAt: json['opened_at']?.toString(),
+      accessory: json['accessory'] != null
+          ? AttendanceAccessoryItem.fromJson(
+              json['accessory'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+class AttendanceDayItem {
+  final String date;
+  final bool attended;
+  final bool isRewardDay;
+  final bool rewardReceived;
+
+  AttendanceDayItem({
+    required this.date,
+    required this.attended,
+    required this.isRewardDay,
+    required this.rewardReceived,
+  });
+
+  factory AttendanceDayItem.fromJson(Map<String, dynamic> json) {
+    return AttendanceDayItem(
+      date: json['date']?.toString() ?? '',
+      attended: json['attended'] ?? false,
+      isRewardDay: json['is_reward_day'] ?? false,
+      rewardReceived: json['reward_received'] ?? false,
+    );
+  }
+}
+
+class AttendanceTodayItem {
+  final String date;
+  final bool attended;
+  final bool isRewardDay;
+  final AttendanceRewardItem? reward;
+
+  AttendanceTodayItem({
+    required this.date,
+    required this.attended,
+    required this.isRewardDay,
+    this.reward,
+  });
+
+  factory AttendanceTodayItem.fromJson(Map<String, dynamic> json) {
+    return AttendanceTodayItem(
+      date: json['date']?.toString() ?? '',
+      attended: json['attended'] ?? false,
+      isRewardDay: json['is_reward_day'] ?? false,
+      reward: json['reward'] != null
+          ? AttendanceRewardItem.fromJson(
+              json['reward'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+class AttendanceSummaryResponse {
+  final int currentStreak;
+  final int bestStreak;
+  final AttendanceTodayItem today;
+  final List<AttendanceDayItem> week;
+
+  AttendanceSummaryResponse({
+    required this.currentStreak,
+    required this.bestStreak,
+    required this.today,
+    required this.week,
+  });
+
+  factory AttendanceSummaryResponse.fromJson(Map<String, dynamic> json) {
+    final weekList = (json['week'] as List<dynamic>? ?? [])
+        .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return AttendanceSummaryResponse(
+      currentStreak: json['current_streak'] ?? 0,
+      bestStreak: json['best_streak'] ?? 0,
+      today: AttendanceTodayItem.fromJson(
+        json['today'] as Map<String, dynamic>? ?? {},
+      ),
+      week: weekList,
+    );
+  }
+}
+
+class AttendanceCalendarResponse {
+  final int year;
+  final int month;
+  final List<AttendanceDayItem> days;
+
+  AttendanceCalendarResponse({
+    required this.year,
+    required this.month,
+    required this.days,
+  });
+
+  factory AttendanceCalendarResponse.fromJson(Map<String, dynamic> json) {
+    final daysList = (json['days'] as List<dynamic>? ?? [])
+        .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return AttendanceCalendarResponse(
+      year: json['year'] ?? 2026,
+      month: json['month'] ?? 10,
+      days: daysList,
+    );
   }
 }

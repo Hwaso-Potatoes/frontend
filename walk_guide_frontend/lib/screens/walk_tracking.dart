@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:geolocator/geolocator.dart';
-import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
 import 'walk_report.dart';
 
@@ -51,6 +50,8 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
   Timer? _timer;
   int? _walkId;
   bool _isEnding = false;
+  bool _isLocationShared = true;
+  bool _isTogglingLocation = false;
 
   final MapController _mapController = MapController();
   Position? _lastPosition;
@@ -68,6 +69,54 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
     _routePoints.add(_currentLatLng);
     _initWalkSession();
     _checkPermissionAndStartTracking();
+  }
+
+  Future<void> _toggleLocationShare() async {
+    if (_isTogglingLocation) return;
+    final newStatus = !_isLocationShared;
+    setState(() {
+      _isTogglingLocation = true;
+      _isLocationShared = newStatus;
+    });
+
+    try {
+      final res = await ApiService.updateLocationShareStatus(
+        _walkId ?? 1,
+        newStatus,
+      );
+      if (mounted) {
+        final msg =
+            res['message'] ?? (newStatus ? '위치 공유가 켜졌습니다.' : '위치 공유가 꺼졌습니다.');
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              msg,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: const Color(0xFF386628),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // Rollback state if server request failed
+        setState(() => _isLocationShared = !newStatus);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isTogglingLocation = false);
+      }
+    }
   }
 
   Future<void> _checkPermissionAndStartTracking() async {
@@ -223,7 +272,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6DF),
+      backgroundColor: const Color(0xFFF8F9E5),
       body: SizedBox.expand(
         child: Stack(
           children: [
@@ -249,8 +298,8 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
                       polylines: [
                         Polyline(
                           points: _routePoints,
-                          strokeWidth: 4.5,
-                          color: const Color(0xFF27722F).withValues(alpha: 0.7),
+                          strokeWidth: 5.0,
+                          color: const Color(0xFF86B453).withOpacity(0.85),
                         ),
                       ],
                     ),
@@ -262,14 +311,14 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
                         height: 44,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27722F),
+                            color: const Color(0xFF86B453),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.25),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
@@ -280,18 +329,19 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
                           ),
                         ),
                       ),
-                      ..._nearbyFriends.map((friend) {
-                        return Marker(
-                          point: ll.LatLng(friend.latitude, friend.longitude),
-                          width: 68,
-                          height: 94,
-                          alignment: Alignment.topCenter,
-                          child: _buildDropPinMarker(
-                            friend.name,
-                            friend.profileImage,
-                          ),
-                        );
-                      }),
+                      if (_isLocationShared)
+                        ..._nearbyFriends.map((friend) {
+                          return Marker(
+                            point: ll.LatLng(friend.latitude, friend.longitude),
+                            width: 68,
+                            height: 94,
+                            alignment: Alignment.topCenter,
+                            child: _buildDropPinMarker(
+                              friend.name,
+                              friend.profileImage,
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ],
@@ -302,12 +352,22 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.only(left: 16.0, top: 10.0),
-                child: CircleAvatar(
-                  backgroundColor: Colors.white,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: IconButton(
                     icon: const Icon(
                       Icons.arrow_back,
-                      color: Color(0xFF27722F),
+                      color: Color(0xFF496B31),
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -315,7 +375,76 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
               ),
             ),
 
-            // 3. 하단 컨트롤 카드
+            // 3. 위치 공유 토글 버튼 ("위치기능 On" / "위치기능 Off")
+            Positioned(
+              left: 24,
+              bottom: 126,
+              child: GestureDetector(
+                onTap: _toggleLocationShare,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Toggle Switch Capsule
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 46,
+                      height: 24,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: _isLocationShared
+                            ? const Color(0xFFB5CF9B)
+                            : const Color(0xFFB5B3A4),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.10),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: AnimatedAlign(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: _isLocationShared
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 2,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Text Label outside switch
+                    Text(
+                      _isLocationShared ? '위치기능 On' : '위치기능 Off',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _isLocationShared
+                            ? const Color(0xFF475E33)
+                            : const Color(0xFF4A493F),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 4. 하단 컨트롤 카드
             Positioned(
               left: 20,
               right: 20,
@@ -331,9 +460,9 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
                   borderRadius: BorderRadius.circular(42),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
+                      color: Colors.black.withOpacity(0.10),
                       blurRadius: 18,
-                      offset: const Offset(0, 8),
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -394,7 +523,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen> {
                         width: 52,
                         height: 52,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF75A64C),
+                          color: Color(0xFF86B453),
                           shape: BoxShape.circle,
                         ),
                         child: _isEnding
@@ -503,7 +632,7 @@ class PinDropShadowPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.22)
+      ..color = Colors.black.withOpacity(0.22)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
 
     final path = Path();

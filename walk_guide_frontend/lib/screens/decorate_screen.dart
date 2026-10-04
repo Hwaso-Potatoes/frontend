@@ -11,7 +11,14 @@ const Color backgroundColor = Color(0xFFF8F9E5);
 
 /// 악세사리 꾸미기 화면
 class DecorationScreen extends StatefulWidget {
-  const DecorationScreen({super.key});
+  final String? initialAccessoryName;
+  final AccessoryItem? initialAccessoryItem;
+
+  const DecorationScreen({
+    super.key,
+    this.initialAccessoryName,
+    this.initialAccessoryItem,
+  });
 
   @override
   State<DecorationScreen> createState() => _DecorationScreenState();
@@ -25,6 +32,34 @@ class _DecorationScreenState extends State<DecorationScreen> {
   void initState() {
     super.initState();
     _items = List.of(dummyAccessories);
+
+    final String? nameToFind =
+        widget.initialAccessoryName ?? widget.initialAccessoryItem?.name;
+    if (nameToFind != null && nameToFind.isNotEmpty) {
+      int foundIndex = _items.indexWhere((item) => item.name.contains(nameToFind) || nameToFind.contains(item.name));
+      if (foundIndex != -1) {
+        final target = _items[foundIndex];
+        _selectedCategory = target.category;
+        _items = _items.map((item) {
+          if (item.category == target.category) {
+            return item.copyWith(isEquipped: item.accessoryId == target.accessoryId);
+          }
+          return item;
+        }).toList();
+      } else {
+        final newItem = AccessoryItem(
+          ownershipId: 99,
+          accessoryId: 99,
+          name: nameToFind,
+          image: '',
+          category: AccessoryCategory.hair,
+          isOwned: true,
+          isEquipped: true,
+        );
+        _items.insert(0, newItem);
+        _selectedCategory = AccessoryCategory.hair;
+      }
+    }
   }
 
   List<AccessoryItem> get _filteredItems =>
