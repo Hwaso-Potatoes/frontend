@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import '../models/friend_model.dart';
 import '../widgets/friend_list_item.dart';
+import '../widgets/friend_detail_dialog.dart';
+import '../widgets/friend_delete_feedback.dart';
 import 'all_friends_screen.dart';
 import 'qr_friend_add_screen.dart';
 
@@ -21,7 +23,8 @@ class FriendScreen extends StatefulWidget {
   State<FriendScreen> createState() => _FriendScreenState();
 }
 
-class _FriendScreenState extends State<FriendScreen> {
+class _FriendScreenState extends State<FriendScreen>
+    with FriendDeleteFeedback<FriendScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   List<Friend> _allFriends = [];
@@ -47,7 +50,15 @@ class _FriendScreenState extends State<FriendScreen> {
     if (!mounted) return;
     setState(() {
       _allFriends = friends;
-      _filteredFriends = friends;
+      final query = _searchController.text.trim().toLowerCase();
+      _filteredFriends = friends
+          .where(
+            (f) =>
+                query.isEmpty ||
+                f.nickname.toLowerCase().contains(query) ||
+                (f.primaryPet?.name.toLowerCase().contains(query) ?? false),
+          )
+          .toList();
       _isLoadingFriends = false;
     });
   }
@@ -77,10 +88,18 @@ class _FriendScreenState extends State<FriendScreen> {
     );
   }
 
-  void _goToAllFriends() {
-    Navigator.of(
+  Future<void> _goToAllFriends() async {
+    await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (context) => const AllFriendsScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const AllFriendsScreen()));
+    if (mounted) await _loadFriends();
+  }
+
+  Future<void> _showFriend(Friend friend) async {
+    if (await showFriendDetails(context, friend) && mounted) {
+      await _loadFriends();
+      if (mounted) showFriendDeleteFeedback();
+    }
   }
 
   @override
@@ -89,175 +108,182 @@ class _FriendScreenState extends State<FriendScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
+      body: buildFriendDeleteFeedback(
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 24),
 
-              // ── 1. 타이틀 "친구" ──
-              const Text(
-                '친구',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 30,
-                  height: 1.1,
-                  color: Colors.black,
+                // ── 1. 타이틀 "친구" ──
+                const Text(
+                  '친구',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 30,
+                    height: 1.1,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 22),
+                const SizedBox(height: 22),
 
-              // ── 2. 검색창 + 초록색 QR 버튼 (한 줄) ──
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFFA9AA80).withOpacity(0.5),
-                          width: 1,
+                // ── 2. 검색창 + 초록색 QR 버튼 (한 줄) ──
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(
+                              0xFFA9AA80,
+                            ).withValues(alpha: 0.5),
+                            width: 1,
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                isCollapsed: true,
-                                border: InputBorder.none,
-                                hintText: '이름으로 검색',
-                                hintStyle: TextStyle(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  isCollapsed: true,
+                                  border: InputBorder.none,
+                                  hintText: '이름으로 검색',
+                                  hintStyle: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: 13,
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                style: const TextStyle(
                                   fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight: FontWeight.w500,
                                   fontSize: 13,
-                                  color: Colors.black.withOpacity(0.4),
+                                  color: Colors.black,
                                 ),
                               ),
-                              style: const TextStyle(
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
-                                color: Colors.black,
-                              ),
                             ),
-                          ),
-                          const Icon(
-                            Icons.search,
-                            size: 22,
-                            color: Colors.black54,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-
-                  // 초록색 QR 코드 버튼 (1번 시안 100% 동일)
-                  GestureDetector(
-                    onTap: _navigateToQrAddScreen,
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: qrButtonGreen,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.qr_code_2_rounded,
-                          color: Colors.white,
-                          size: 28,
+                            const Icon(
+                              Icons.search,
+                              size: 22,
+                              color: Colors.black54,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 10),
 
-              const SizedBox(height: 28),
-
-              // ── 3. "내 친구" 헤더 + "더보기" ──
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Text(
-                    '내 친구',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
-                      height: 1.1,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _goToAllFriends,
-                    child: Text(
-                      '더보기',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        height: 1.0,
-                        color: const Color(0xFF636037).withOpacity(0.5),
+                    // 초록색 QR 코드 버튼 (1번 시안 100% 동일)
+                    GestureDetector(
+                      onTap: _navigateToQrAddScreen,
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: qrButtonGreen,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.qr_code_2_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── 4. 내 친구 미리보기 목록 ──
-              if (_isLoadingFriends)
-                const Padding(
-                  padding: EdgeInsets.only(top: 40),
-                  child: Center(
-                    child: CircularProgressIndicator(color: qrButtonGreen),
-                  ),
-                )
-              else if (previewFriends.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Center(
-                    child: Text(
-                      '검색된 친구가 없어요',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 13,
-                        color: Colors.black.withOpacity(0.4),
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: previewFriends.length,
-                    separatorBuilder: (_, __) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: const Color(0xFFA9AA80).withOpacity(0.4),
-                      ),
-                    ),
-                    itemBuilder: (context, index) {
-                      return FriendListItem(friend: previewFriends[index]);
-                    },
-                  ),
+                  ],
                 ),
-            ],
+
+                const SizedBox(height: 28),
+
+                // ── 3. "내 친구" 헤더 + "더보기" ──
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      '내 친구',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        height: 1.1,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _goToAllFriends,
+                      child: Text(
+                        '더보기',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          height: 1.0,
+                          color: const Color(0xFF636037).withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── 4. 내 친구 미리보기 목록 ──
+                if (_isLoadingFriends)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(color: qrButtonGreen),
+                    ),
+                  )
+                else if (previewFriends.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text(
+                        '검색된 친구가 없어요',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: Colors.black.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: previewFriends.length,
+                      separatorBuilder: (_, _) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: const Color(0xFFA9AA80).withValues(alpha: 0.4),
+                        ),
+                      ),
+                      itemBuilder: (context, index) {
+                        return FriendListItem(
+                          friend: previewFriends[index],
+                          onTap: () => _showFriend(previewFriends[index]),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

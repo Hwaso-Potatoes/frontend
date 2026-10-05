@@ -23,6 +23,7 @@ class WalkDistanceChartCard extends StatelessWidget {
   final String title; // "오늘 시간대별 거리" 등
   final String totalLabel; // "1.8km" 등 (이미 포맷된 문자열)
   final List<ChartBarEntry> bars;
+  final String? peakLabel;
 
   static const double _maxBarWidth = 54;
 
@@ -31,12 +32,18 @@ class WalkDistanceChartCard extends StatelessWidget {
     required this.title,
     required this.totalLabel,
     required this.bars,
+    this.peakLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final double maxValue =
-        bars.map((b) => b.value).fold(0.0, (a, b) => a > b ? a : b);
+    final double maxValue = bars
+        .map((b) => b.value)
+        .fold(0.0, (a, b) => a > b ? a : b);
+
+    final minValue = bars
+        .map((b) => b.value)
+        .fold<double>(double.infinity, (a, b) => a < b ? a : b);
 
     return Container(
       height: 234,
@@ -60,7 +67,7 @@ class WalkDistanceChartCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   fontSize: 13,
                   height: 1.0,
-                  color: const Color(0xFF636037).withOpacity(0.75),
+                  color: const Color(0xFF636037).withValues(alpha: 0.75),
                 ),
               ),
               Text(
@@ -75,7 +82,26 @@ class WalkDistanceChartCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          if (peakLabel != null) ...[
+            const SizedBox(height: 4),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: peakLabel,
+                    style: const TextStyle(color: Color(0xFF72AA4F)),
+                  ),
+                  const TextSpan(text: '에\n가장 많이 걸었어요'),
+                ],
+              ),
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.1,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -84,8 +110,9 @@ class WalkDistanceChartCard extends StatelessWidget {
                 // (막대 사이 최소 간격 8 확보 기준)
                 final double idealWidth =
                     (constraints.maxWidth - 8 * (n - 1)) / n;
-                final double barWidth =
-                    idealWidth < _maxBarWidth ? idealWidth : _maxBarWidth;
+                final double barWidth = idealWidth < _maxBarWidth
+                    ? idealWidth
+                    : _maxBarWidth;
 
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -108,9 +135,15 @@ class WalkDistanceChartCard extends StatelessWidget {
                                 heightFactor: heightFraction,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: bar.hasData
+                                    color:
+                                        !bar.hasData ||
+                                            (peakLabel != null &&
+                                                bar.value == minValue)
+                                        ? const Color(0xFFE2F3C2)
+                                        : peakLabel == null ||
+                                              bar.value == maxValue
                                         ? const Color(0xFF72AA4F)
-                                        : const Color(0xFFE2F3C2),
+                                        : const Color(0xFFA0CF7B),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
@@ -125,7 +158,11 @@ class WalkDistanceChartCard extends StatelessWidget {
                               fontWeight: FontWeight.w400,
                               fontSize: 11,
                               height: 1.0,
-                              color: const Color(0xFF636037).withOpacity(0.75),
+                              color: peakLabel != null && bar.value == maxValue
+                                  ? Colors.black
+                                  : const Color(
+                                      0xFF636037,
+                                    ).withValues(alpha: 0.75),
                             ),
                           ),
                         ],

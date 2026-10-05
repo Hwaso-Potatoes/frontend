@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../icons/dog_icon.dart';
+import 'dog_character.dart';
 import '../../models/decoration_model.dart';
 
 /// 강아지 + 언덕 배경 씬
@@ -18,11 +18,13 @@ import '../../models/decoration_model.dart';
 class DogStage extends StatelessWidget {
   final String dogBreed;
   final AccessoryItem? equippedHair;
+  final double characterScale;
 
   const DogStage({
     super.key,
     required this.dogBreed,
     this.equippedHair,
+    this.characterScale = 1,
   });
 
   static const double designWidth = 402;
@@ -31,8 +33,6 @@ class DogStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hairAnchor = defaultAnchors[AccessoryCategory.hair]!;
-
     return AspectRatio(
       aspectRatio: designWidth / designHeight,
       child: LayoutBuilder(
@@ -91,32 +91,15 @@ class DogStage extends StatelessWidget {
                 ),
                 // 강아지(png) + 헤어 악세사리 오버레이
                 Positioned(
-                  top: sy(118),
-                  left: s(63),
-                  child: SizedBox(
-                    width: s(256),
-                    height: s(256),
-                    child: Stack(
-                      children: [
-                        DogIcon(breed: dogBreed, size: s(256)),
-                        if (equippedHair != null)
-                          Align(
-                            alignment: Alignment(
-                              hairAnchor.position.dx * 2 - 1,
-                              hairAnchor.position.dy * 2 - 1,
-                            ),
-                            child: FractionallySizedBox(
-                              widthFactor: hairAnchor.scale,
-                              child: Image.network(
-                                equippedHair!.image,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                  top:
+                      sy(118) +
+                      s(256 * (1 - characterScale)) +
+                      s(characterScale == 1 ? 0 : 16),
+                  left: s(63 + 128 * (1 - characterScale)),
+                  child: DogCharacter(
+                    breed: dogBreed,
+                    size: s(256 * characterScale),
+                    equippedHair: equippedHair,
                   ),
                 ),
               ],

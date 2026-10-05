@@ -3,7 +3,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/friend_model.dart';
 import '../services/api_service.dart';
 import 'qr_friend_success_screen.dart';
 

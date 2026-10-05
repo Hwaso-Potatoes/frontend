@@ -11,11 +11,10 @@
 //       호출하도록 임시 연결해둠. 디자인 오면 교체할 것.
 // 3. 받은 친구 요청(GET api/friends/requests/) 보여주는 화면/위치 미정.
 //    -> 이 파일에 관련 모델/mock 함수는 만들어두되, 화면 연결은 보류.
-// 4. 친구 삭제(DELETE api/friends/:friend_id/) 버튼 위치(스와이프/롱프레스 등) 미정.
-//    -> mock 함수만 만들어두고 화면 연결은 보류.
+// 4. 삭제 UI는 연결됨. 실제 DELETE API 연결은 services에서 교체 필요.
 
-import 'dart:async';
-import 'dart:math';
+// Compatibility for existing QR callers; mock behavior lives in services.
+export '../services/friend_mock_service.dart';
 
 /// 친구의 반려견 정보 (친구 목록 응답의 pets 배열 안 항목)
 /// 가정: 한 유저는 반려견을 한 마리만 키운다고 가정하고, pets[0]만 사용함.
@@ -24,13 +23,25 @@ class FriendPet {
   final String name;
   final String breed;
 
-  const FriendPet({required this.id, required this.name, required this.breed});
+  final int? age;
+  final List<String> personalityTags;
+  const FriendPet({
+    required this.id,
+    required this.name,
+    required this.breed,
+    this.age,
+    this.personalityTags = const [],
+  });
 
   factory FriendPet.fromJson(Map<String, dynamic> json) {
     return FriendPet(
       id: json['id'] as int,
       name: json['name'] as String,
       breed: json['breed'] as String,
+      age: json['age'] as int?,
+      personalityTags: List<String>.from(
+        json['personalities'] as List? ?? const [],
+      ),
     );
   }
 }
@@ -124,116 +135,6 @@ class FriendRequest {
 // 쓰는 가짜 호출들. TODO(backend): 실제 HTTP 연동 코드로 교체할 것.
 // ══════════════════════════════════════════════════════════════
 
-/// GET api/friends/ 를 흉내낸 mock. 산책 상태는 화면 확인용으로 임시로 채움.
-Future<List<Friend>> mockFetchMyFriends() async {
-  await Future.delayed(const Duration(milliseconds: 300));
-
-  final raw = [
-    {
-      'id': 1,
-      'nickname': '토리보호자',
-      'pets': [
-        {'id': 1, 'name': '토리', 'breed': '포메라니안'},
-      ],
-    },
-    {
-      'id': 2,
-      'nickname': '밀크보호자',
-      'pets': [
-        {'id': 2, 'name': '밀크', 'breed': '말티즈'},
-      ],
-    },
-    {
-      'id': 3,
-      'nickname': '휴지보호자',
-      'pets': [
-        {'id': 3, 'name': '휴지', 'breed': '푸들'},
-      ],
-    },
-    {
-      'id': 4,
-      'nickname': '초코보호자',
-      'pets': [
-        {'id': 4, 'name': '초코', 'breed': '닥스훈트'},
-      ],
-    },
-    {
-      'id': 5,
-      'nickname': '뭉치보호자',
-      'pets': [
-        {'id': 5, 'name': '뭉치', 'breed': '사모예드'},
-      ],
-    },
-  ];
-
-  final friends = raw.map((j) => Friend.fromJson(j)).toList();
-
-  // TODO(backend): 아래 산책 상태는 전부 mock. 실제 필드 확정되면 삭제.
-  final walkStatuses = <(bool, String)>[
-    (true, '지금 산책 중 · 12분째'),
-    (false, '2시간 전 산책 완료'),
-    (false, '5시간 전 산책 완료'),
-    (false, '3시간 전 산책 완료'),
-    (false, '12시간 전 산책 완료'),
-  ];
-
-  return List.generate(friends.length, (i) {
-    final (isWalking, text) = walkStatuses[i];
-    return friends[i].copyWith(isWalkingNow: isWalking, walkStatusText: text);
-  });
-}
-
-/// GET /api/friends/search/?nickname= 를 흉내낸 mock.
-/// 최대 5명, 입력값이 nickname에 포함되는 유저만 반환한다는 명세를 그대로 흉내냄.
-Future<List<FriendSearchResult>> mockSearchFriends(String query) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-
-  if (query.trim().isEmpty) return [];
-
-  final mockUsers = [
-    const FriendSearchResult(id: 10, nickname: '보리보호자'),
-    const FriendSearchResult(id: 11, nickname: '뭉치사랑'),
-    const FriendSearchResult(id: 12, nickname: '초코맘'),
-    const FriendSearchResult(id: 13, nickname: '해피독'),
-    const FriendSearchResult(id: 14, nickname: '뽀삐아빠'),
-    const FriendSearchResult(id: 15, nickname: '몽이보호자'),
-  ];
-
-  return mockUsers.where((u) => u.nickname.contains(query)).take(5).toList();
-}
-
-/// POST api/friends/ (receiver_id) 를 흉내낸 mock. 201 -> { "id": N } 형태.
-Future<int> mockSendFriendRequest(int receiverId) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-  return Random().nextInt(1000); // 실제로는 응답의 request id
-}
-
-/// DELETE api/friends/:friend_id/ 를 흉내낸 mock. 204 No Content.
-Future<void> mockDeleteFriend(int friendId) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-}
-
-/// GET api/friends/requests/ 를 흉내낸 mock. 화면 연결은 보류 상태.
-Future<List<FriendRequest>> mockFetchFriendRequests() async {
-  await Future.delayed(const Duration(milliseconds: 200));
-  return [
-    FriendRequest.fromJson({
-      'id': 3,
-      'requester': {'id': 2, 'nickname': '사용자B'},
-    }),
-  ];
-}
-
-/// POST api/friends/requests/:request_id/accept/ 를 흉내낸 mock. 204.
-Future<void> mockAcceptFriendRequest(int requestId) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-}
-
-/// POST api/friends/requests/:request_id/reject/ 를 흉내낸 mock. 204.
-Future<void> mockRejectFriendRequest(int requestId) async {
-  await Future.delayed(const Duration(milliseconds: 200));
-}
-
 /// POST api/friends/qr/ 응답 모델 (나의 QR 생성)
 class QrCodeGenerateResponse {
   final String token;
@@ -249,38 +150,4 @@ class QrCodeGenerateResponse {
       expiresIn: json['expires_in'] as int? ?? 300,
     );
   }
-}
-
-/// POST api/friends/qr/ (나의 QR 생성) mock
-Future<QrCodeGenerateResponse> mockGenerateMyQrCode() async {
-  await Future.delayed(const Duration(milliseconds: 250));
-  final randomToken = List.generate(
-    40,
-    (index) =>
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Random()
-            .nextInt(62)],
-  ).join();
-  return QrCodeGenerateResponse(token: randomToken, expiresIn: 300);
-}
-
-/// POST api/friends/qr/redeem/ (QR 스캔 후 친구 추가) mock
-Future<Friend> mockRedeemQrCode(String token) async {
-  await Future.delayed(const Duration(milliseconds: 300));
-  if (token.trim().isEmpty) {
-    throw Exception('유효하지 않은 QR 토큰입니다.');
-  }
-
-  final mockFriendJson = {
-    'id': Random().nextInt(100) + 10,
-    'nickname': '은비보호자',
-    'pets': [
-      {'id': 4, 'name': '뭉치', 'breed': '사모예드'},
-    ],
-  };
-
-  final friend = Friend.fromJson(mockFriendJson);
-  return friend.copyWith(
-    isWalkingNow: true,
-    walkStatusText: '오프라인 QR 코드로 친구 추가됨',
-  );
 }

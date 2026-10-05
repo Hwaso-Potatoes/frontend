@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'screens/login.dart';
-import 'screens/main_shell.dart';
-import 'screens/home.dart';
 import 'screens/findPWreset.dart';
 
 void main() async {

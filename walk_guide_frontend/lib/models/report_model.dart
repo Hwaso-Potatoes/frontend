@@ -112,7 +112,11 @@ final Map<ReportPeriod, ReportData> dummyReportData = {
     growthFilledCells: 2,
     growthTotalCells: 5,
     badgeTitle: '이번 주 획득 뱃지',
-    badgeImagePaths: const [_sampleBadgeImage, _sampleBadgeImage, _sampleBadgeImage],
+    badgeImagePaths: const [
+      _sampleBadgeImage,
+      _sampleBadgeImage,
+      _sampleBadgeImage,
+    ],
   ),
 
   ReportPeriod.month: ReportData(
@@ -191,3 +195,151 @@ final Map<ReportPeriod, ReportData> dummyReportData = {
     badgeImagePaths: List.generate(8, (_) => _sampleBadgeImage),
   ),
 };
+
+/// Presentation mock for the final three-tab report. Historical week/six-month
+/// data above is preserved for other callers. These values are not API totals.
+class ReportComparisonData {
+  final String periodLabel, comparisonPrefix, differenceLabel, comparisonSuffix;
+  final String currentLegend, previousLegend, chartContext, peakLabel;
+  final List<double> current, previous;
+  final List<String> axisLabels;
+  final List<ChartBarEntry> bars;
+  final int currentPointIndex;
+  final bool isDaily;
+  final int streakDays, recordDays;
+  const ReportComparisonData({
+    required this.periodLabel,
+    required this.comparisonPrefix,
+    required this.differenceLabel,
+    required this.comparisonSuffix,
+    required this.currentLegend,
+    required this.previousLegend,
+    required this.current,
+    required this.previous,
+    required this.axisLabels,
+    required this.currentPointIndex,
+    required this.chartContext,
+    required this.peakLabel,
+    required this.bars,
+    this.isDaily = false,
+    this.streakDays = 5,
+    this.recordDays = 9,
+  });
+  String get peakDistance =>
+      '${bars.map((b) => b.value).reduce((a, b) => a > b ? a : b).toStringAsFixed(1)}km';
+}
+
+ReportComparisonData mockComparisonReport(
+  ReportPeriod period,
+  DateTime date, {
+  DateTime? today,
+}) {
+  final now = today ?? DateTime.now();
+  // Earlier periods deliberately use different mock values, not live statistics.
+  final currentPeriod = period == ReportPeriod.day
+      ? DateUtils.isSameDay(date, now)
+      : period == ReportPeriod.month
+      ? date.year == now.year && date.month == now.month
+      : date.year == now.year;
+  final factor = currentPeriod ? 1.0 : .8;
+  List<double> scaled(List<double> values) =>
+      values.map((v) => v * factor).toList();
+  List<ChartBarEntry> bars(List<String> labels, List<double> values) =>
+      List.generate(
+        labels.length,
+        (i) => ChartBarEntry(
+          label: labels[i],
+          value: values[i] * factor,
+          hasData: values[i] > .15,
+        ),
+      );
+  switch (period) {
+    case ReportPeriod.day:
+      return ReportComparisonData(
+        periodLabel: DateUtils.isSameDay(date, now)
+            ? '오늘'
+            : '${date.month}월 ${date.day}일',
+        comparisonPrefix: '평소보다',
+        differenceLabel: '${(.3 * factor).toStringAsFixed(1)}km',
+        comparisonSuffix: '더 걸었어요',
+        currentLegend: '오늘',
+        previousLegend: '평균',
+        current: scaled([0, .02, .04, .02, 0, .3, .08, .96, 0, 0, 0]),
+        previous: [0, 0, 0, 0, 0, 0, .23, 0, .92, 0, 0],
+        currentPointIndex: 9,
+        axisLabels: const ['0시', '12시', '24시'],
+        isDaily: true,
+        chartContext: '오늘 하루 시간대',
+        peakLabel: '저녁',
+        bars: bars(['아침', '점심', '오후', '저녁'], [.1, .74, .1, 1.8]),
+      );
+    case ReportPeriod.month:
+      final previousMonth = DateTime(date.year, date.month - 1);
+      return ReportComparisonData(
+        periodLabel: '${date.month}월',
+        comparisonPrefix: '지난달보다',
+        differenceLabel:
+            '${(2 * factor).toStringAsFixed(currentPeriod ? 0 : 1)}km',
+        comparisonSuffix: '더 걸었어요',
+        currentLegend: '${date.month}월',
+        previousLegend: '${previousMonth.month}월',
+        current: scaled([.55, .74, .74, .74, .91, .83, .74, .92, 1.1]),
+        previous: [.55, .61, .35, .97, .3, .75, .99, 1.14, 1.03, .83, .61],
+        currentPointIndex: 8,
+        axisLabels: [
+          '${date.month}.1',
+          '${date.month}.${DateTime(date.year, date.month + 1, 0).day}',
+        ],
+        chartContext: '이번 한달 가운데',
+        peakLabel: '3주째',
+        bars: bars(['1주', '2주', '3주', '4주'], [1.15, .64, 1.8, 1.38]),
+      );
+    case ReportPeriod.year:
+      return ReportComparisonData(
+        periodLabel: '${date.year}',
+        comparisonPrefix: '작년보다',
+        differenceLabel: '${(.9 * factor).toStringAsFixed(1)}km',
+        comparisonSuffix: '더 걷고있어요',
+        currentLegend: '올해',
+        previousLegend: '작년',
+        current: scaled([
+          .54,
+          .63,
+          .72,
+          .72,
+          .72,
+          .88,
+          .81,
+          .72,
+          .84,
+          .96,
+          1.08,
+          .87,
+          .87,
+        ]),
+        previous: [
+          .54,
+          .66,
+          .60,
+          .68,
+          .64,
+          .88,
+          .77,
+          .67,
+          .86,
+          .94,
+          1.08,
+          .89,
+          .89,
+        ],
+        currentPointIndex: 10,
+        axisLabels: const ['1월', '6월', '12월'],
+        chartContext: '이번 년도 가운데',
+        peakLabel: '10월',
+        bars: bars(['7월', '8월', '9월', '10월'], [1.48, 1.26, 1.55, 1.8]),
+      );
+    case ReportPeriod.week:
+    case ReportPeriod.sixMonths:
+      throw ArgumentError('This report UI exposes day/month/year only.');
+  }
+}

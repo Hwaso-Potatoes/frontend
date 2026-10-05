@@ -2,9 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
-import 'walk_tracking.dart';
 import 'decorate_screen.dart';
 import 'attendance_screen.dart';
 

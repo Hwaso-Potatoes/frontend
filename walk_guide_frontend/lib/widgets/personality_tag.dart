@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// 성격 태그 1개 (에너지형 / 호기심형 등)
 /// TODO(backend): personalities의 정확한 API 키 값(예: "energy" 외 나머지 5개)
@@ -12,7 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 /// 받으면 이 switch문의 icon 값만 교체하면 됨.
 class PersonalityTag extends StatelessWidget {
   final String label;
-  const PersonalityTag({super.key, required this.label});
+  final Color? backgroundColor;
+  const PersonalityTag({super.key, required this.label, this.backgroundColor});
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +48,8 @@ class PersonalityTag extends StatelessWidget {
         break;
       case '얌전형':
         bgColor = const Color(0xFFEAE4B1);
-        icon = Icons.local_florist; // TODO(design): 정확한 "화분" 모양은 아니라 근사치. 확정 아이콘 받으면 교체.
+        icon = Icons
+            .local_florist; // TODO(design): 정확한 "화분" 모양은 아니라 근사치. 확정 아이콘 받으면 교체.
         iconSize = 14;
         break;
       default:
@@ -62,7 +63,7 @@ class PersonalityTag extends StatelessWidget {
       height: 26,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: bgColor,
+        color: backgroundColor ?? bgColor,
         borderRadius: BorderRadius.circular(50),
         border: Border.all(color: const Color(0xFFA9AA80), width: 1),
       ),
@@ -74,7 +75,8 @@ class PersonalityTag extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+              fontFamily: 'Inter',
               fontWeight: FontWeight.w500,
               fontSize: 13,
               height: 1.0,
