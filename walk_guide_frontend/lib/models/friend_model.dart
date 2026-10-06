@@ -35,10 +35,14 @@ class FriendPet {
 
   factory FriendPet.fromJson(Map<String, dynamic> json) {
     return FriendPet(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      breed: json['breed'] as String,
-      age: json['age'] as int?,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      name: json['name']?.toString() ?? '',
+      breed: json['breed']?.toString() ?? '',
+      age: json['age'] is int
+          ? json['age']
+          : int.tryParse(json['age']?.toString() ?? ''),
       personalityTags: List<String>.from(
         json['personalities'] as List? ?? const [],
       ),
@@ -71,12 +75,13 @@ class Friend {
   factory Friend.fromJson(Map<String, dynamic> json) {
     final petsJson = json['pets'] as List<dynamic>? ?? [];
     return Friend(
-      id: json['id'] as int,
-      nickname: json['nickname'] as String,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      nickname: json['nickname']?.toString() ?? '',
       pets: petsJson
           .map((p) => FriendPet.fromJson(p as Map<String, dynamic>))
           .toList(),
-      // 아래 두 값은 실제 응답에 없어서 기본값으로 둠 (mock에서 별도 주입)
       isWalkingNow: false,
       walkStatusText: '',
     );
@@ -102,8 +107,10 @@ class FriendSearchResult {
 
   factory FriendSearchResult.fromJson(Map<String, dynamic> json) {
     return FriendSearchResult(
-      id: json['id'] as int,
-      nickname: json['nickname'] as String,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      nickname: json['nickname']?.toString() ?? '',
     );
   }
 }
@@ -123,9 +130,13 @@ class FriendRequest {
   factory FriendRequest.fromJson(Map<String, dynamic> json) {
     final requester = json['requester'] as Map<String, dynamic>;
     return FriendRequest(
-      id: json['id'] as int,
-      requesterId: requester['id'] as int,
-      requesterNickname: requester['nickname'] as String,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      requesterId: requester['id'] is int
+          ? requester['id']
+          : int.tryParse(requester['id']?.toString() ?? '0') ?? 0,
+      requesterNickname: requester['nickname']?.toString() ?? '',
     );
   }
 }
@@ -144,10 +155,10 @@ class QrCodeGenerateResponse {
 
   factory QrCodeGenerateResponse.fromJson(Map<String, dynamic> json) {
     return QrCodeGenerateResponse(
-      token:
-          json['token'] as String? ??
-          'matqO3cQVFZ2Hxge5ZU25JT4Kj4ud0G63jDbRd7LjAg',
-      expiresIn: json['expires_in'] as int? ?? 300,
+      token: json['token']?.toString() ?? '',
+      expiresIn: json['expires_in'] is int
+          ? json['expires_in']
+          : int.tryParse(json['expires_in']?.toString() ?? '300') ?? 300,
     );
   }
 }

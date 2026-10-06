@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import 'decorate_screen.dart';
 import 'attendance_screen.dart';
+import 'login.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -38,6 +39,16 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _homeDataFuture = ApiService.getHomeDashboardData();
     });
+  }
+
+  /// 토큰이 없거나 만료(401)된 경우: 저장된 세션을 지우고 로그인 화면으로
+  Future<void> _goToLogin() async {
+    await ApiService.clearSession();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   void _showPermissionDialog(BuildContext context) {
@@ -77,23 +88,34 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           if (snapshot.hasError) {
+            final error = snapshot.error;
+            final bool needsLogin =
+                error is ApiException && error.isUnauthorized;
+            final String message = error is ApiException
+                ? error.message
+                : '데이터를 불러오지 못했습니다.';
+            debugPrint('🚨 홈 데이터 로드 실패: $error');
+
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '데이터를 불러오지 못했습니다.',
+                    message,
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.black.withOpacity(0.5)),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    onPressed: () => _loadDashboard(),
+                    onPressed: needsLogin
+                        ? _goToLogin
+                        : () => _loadDashboard(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                     ),
-                    child: const Text(
-                      '다시 시도',
-                      style: TextStyle(color: Colors.white),
+                    child: Text(
+                      needsLogin ? '다시 로그인' : '다시 시도',
+                      style: const TextStyle(color: Colors.white),
                     ),
                   ),
                 ],

@@ -1,6 +1,7 @@
 // lib/models/decoration_model.dart
 
 import 'package:flutter/material.dart';
+import '../config/api_config.dart';
 
 // ── 백엔드/디자인팀 확인 필요 목록 ──
 // 1. (디자인팀) 헤어/케이프/옷/신발 오버레이용 "품종별 앵커 좌표(x,y,scale)" 필요
@@ -127,7 +128,7 @@ final List<AccessoryItem> dummyAccessories = [
     "accessory": {
       "id": 1,
       "name": "헤어핀1",
-      "image": "http://127.0.0.1:8000/media/accessories/IMG_2649_1.png",
+      "image": "$kApiBaseUrl/media/accessories/IMG_2649_1.png",
       "category": "HAIR",
     },
     "is_equipped": true,

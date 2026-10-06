@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 import '../models/friend_model.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // -----------------------------------------------------------------------------
 // [1. 홈 화면 대시보드 모델]
@@ -232,22 +234,182 @@ class WalkReportData {
 }
 
 // -----------------------------------------------------------------------------
+// [API 공통 예외] - 상태코드를 화면까지 전달해서 401이면 재로그인 유도
+// -----------------------------------------------------------------------------
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  ApiException(this.statusCode, this.message);
+
+  bool get isUnauthorized => statusCode == 401;
+
+  @override
+  String toString() => 'ApiException($statusCode): $message';
+}
+
+// -----------------------------------------------------------------------------
 // [4. ApiService 메인 클래스]
 // -----------------------------------------------------------------------------
 class ApiService {
-  static const String baseUrl = 'http://localhost';
-  static const bool useMockData = true;
+  static const String baseUrl = kApiBaseUrl;
+  static const bool useMockData = kUseMockData;
+
+  static const storage = FlutterSecureStorage();
+
+  static const String _kAccessToken = 'access_token';
+  static const String _kRefreshToken = 'refresh_token';
+  static const String _kUserId = 'user_id';
+  static const String _kPetId = 'pet_id';
+
+  // ---------------------------------------------------------------------------
+  // [인증 세션 관리]
+  // ---------------------------------------------------------------------------
+
+  /// 로그인/회원가입 성공 시 토큰 저장. userId가 응답에 없으면 JWT payload의
+  /// user_id 클레임(SimpleJWT 기본값)에서 꺼내 저장함.
+  static Future<void> saveSession({
+    required String? access,
+    String? refresh,
+    String? userId,
+  }) async {
+    if (access == null || access.isEmpty) return;
+    await storage.write(key: _kAccessToken, value: access);
+    if (refresh != null && refresh.isNotEmpty) {
+      await storage.write(key: _kRefreshToken, value: refresh);
+    }
+    final id = userId ?? _userIdFromJwt(access);
+    if (id != null) await storage.write(key: _kUserId, value: id);
+    // 다른 계정으로 로그인했을 때 이전 계정의 반려견 id가 남지 않도록 초기화
+    await storage.delete(key: _kPetId);
+  }
+
+  static Future<void> clearSession() async {
+    await storage.delete(key: _kAccessToken);
+    await storage.delete(key: _kRefreshToken);
+    await storage.delete(key: _kUserId);
+    await storage.delete(key: _kPetId);
+  }
+
+  static Future<String?> getAccessToken() => storage.read(key: _kAccessToken);
+
+  static Future<String?> getUserId() async {
+    final saved = await storage.read(key: _kUserId);
+    if (saved != null && saved.isNotEmpty) return saved;
+    final token = await getAccessToken();
+    return token == null ? null : _userIdFromJwt(token);
+  }
+
+  static Future<void> savePetId(int petId) =>
+      storage.write(key: _kPetId, value: petId.toString());
+
+  /// JWT(header.payload.signature)의 payload에서 user_id 추출
+  static String? _userIdFromJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      final id = payload['user_id'] ?? payload['id'] ?? payload['sub'];
+      return id?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 공통 헤더. token을 직접 넘기면 그걸 쓰고, 아니면 저장된 access token을 사용.
+  static Future<Map<String, String>> _headers({String? token}) async {
+    final accessToken = token ?? await getAccessToken();
+    return {
+      'Content-Type': 'application/json',
+      if (accessToken != null && accessToken.isNotEmpty)
+        'Authorization': 'Bearer $accessToken',
+    };
+  }
+
+  /// 상태코드 확인 후 UTF-8로 디코딩. (Django JSON 응답엔 charset이 없어서
+  /// res.body를 그대로 쓰면 한글이 깨질 수 있음)
+  static dynamic _decodeOrThrow(http.Response res, String label) {
+    final text = utf8.decode(res.bodyBytes);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return text.isEmpty ? null : jsonDecode(text);
+    }
+    String message = '$label 요청 실패 (${res.statusCode})';
+    try {
+      final body = jsonDecode(text);
+      if (body is Map && body['detail'] != null) {
+        message = body['detail'].toString();
+      }
+    } catch (_) {}
+    throw ApiException(res.statusCode, message);
+  }
+
+  /// 리스트 응답이 그대로 오든, DRF 페이지네이션({results: [...]})이나
+  /// {data: [...]} 형태로 오든 리스트로 꺼냄
+  static List<dynamic> _asList(dynamic body) {
+    if (body is List) return body;
+    if (body is Map) {
+      final inner = body['results'] ?? body['data'];
+      if (inner is List) return inner;
+    }
+    return const [];
+  }
+
+  /// 저장된 pet_id가 없으면 GET api/pets/ 목록의 첫 번째 반려견을 사용
+  static Future<int?> _resolvePetId(Map<String, String> headers) async {
+    final saved = int.tryParse(await storage.read(key: _kPetId) ?? '');
+    if (saved != null) return saved;
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/pets/'),
+        headers: headers,
+      );
+      final pets = _asList(_decodeOrThrow(res, '반려견 목록'));
+      if (pets.isEmpty) return null;
+      final id = int.tryParse(pets.first['id']?.toString() ?? '');
+      if (id != null) await savePetId(id);
+      return id;
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) rethrow;
+      return null;
+    }
+  }
+
+  static const Map<String, String> _personalityLabels = {
+    'energy': '에너지형',
+    'social': '사회성형',
+    'timid': '겁쟁이형',
+    'curious': '호기심형',
+    'relaxed': '느긋형',
+    'calm': '얌전형',
+  };
+
+  static int _ageFrom(Map<String, dynamic> pet) {
+    if (pet['age'] is int) return pet['age'];
+    final birth = DateTime.tryParse(pet['birth_date']?.toString() ?? '');
+    if (birth == null) return 1;
+    final now = DateTime.now();
+    var age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age -= 1;
+    }
+    return age < 0 ? 0 : age;
+  }
 
   // [홈 화면 종합 데이터 로드]
+  // userId/petId를 넘기지 않으면 저장된 로그인 정보에서 꺼내 씀
+  // (기존엔 '1'로 하드코딩되어 있어서 다른 계정이면 남의 데이터를 요청하게 됨)
   static Future<HomeDashboardResponse> getHomeDashboardData({
-    String userId = '1',
-    int petId = 1,
+    String? userId,
+    int? petId,
   }) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
       return HomeDashboardResponse(
         userName: '예은님',
-        petId: petId,
+        petId: petId ?? 1,
         petName: '두부',
         petBreed: '말티즈',
         petAge: 2,
@@ -286,43 +448,95 @@ class ApiService {
     }
 
     try {
-      final userRes = await http.get(Uri.parse('$baseUrl/api/users/$userId/'));
-      final petRes = await http.get(Uri.parse('$baseUrl/api/pets/$petId/'));
-      final missionRes = await http.get(
-        Uri.parse('$baseUrl/api/pets/$petId/missions/?period=DAILY'),
-      );
-      final friendsRes = await http.get(Uri.parse('$baseUrl/api/friends/'));
+      final headers = await _headers();
+      if (!headers.containsKey('Authorization')) {
+        throw ApiException(401, '로그인 정보가 없습니다. 다시 로그인해주세요.');
+      }
 
-      final userData = jsonDecode(userRes.body);
-      final petData = jsonDecode(petRes.body);
-      final missionList = (jsonDecode(missionRes.body) as List)
-          .map((m) => PetMissionItem.fromJson(m))
+      final resolvedUserId = userId ?? await getUserId();
+      if (resolvedUserId == null) {
+        throw ApiException(401, '사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+      }
+      final resolvedPetId = petId ?? await _resolvePetId(headers);
+      if (resolvedPetId == null) {
+        throw ApiException(404, '등록된 반려견을 찾을 수 없습니다.');
+      }
+
+      final responses = await Future.wait([
+        http.get(
+          Uri.parse('$baseUrl/api/users/$resolvedUserId/'),
+          headers: headers,
+        ),
+        http.get(
+          Uri.parse('$baseUrl/api/pets/$resolvedPetId/'),
+          headers: headers,
+        ),
+        http.get(
+          Uri.parse('$baseUrl/api/pets/$resolvedPetId/missions/?period=DAILY'),
+          headers: headers,
+        ),
+        http.get(Uri.parse('$baseUrl/api/friends/'), headers: headers),
+      ]);
+
+      // 사용자/반려견 정보는 필수 → 실패하면 에러
+      final userData =
+          _decodeOrThrow(responses[0], '사용자 정보') as Map<String, dynamic>;
+      final petData =
+          _decodeOrThrow(responses[1], '반려견 정보') as Map<String, dynamic>;
+
+      // 미션/친구는 부가 정보 → 401이 아니면 실패해도 빈 목록으로 홈은 띄움
+      List<dynamic> optionalList(http.Response res, String label) {
+        try {
+          return _asList(_decodeOrThrow(res, label));
+        } on ApiException catch (e) {
+          if (e.isUnauthorized) rethrow;
+          return const [];
+        }
+      }
+
+      final missionList = optionalList(responses[2], '미션')
+          .map((m) => PetMissionItem.fromJson(m as Map<String, dynamic>))
           .toList();
-      final friendList = (jsonDecode(friendsRes.body) as List)
-          .map(
-            (f) => FriendDogDisplay(
-              name: f['pet_name'] ?? '친구',
-              profileImage: f['profile_image_url'],
-            ),
-          )
-          .toList();
+      final friendList = optionalList(responses[3], '친구').map((f) {
+        // GET api/friends/ 응답: { id, nickname, pets: [{ id, name, breed }] }
+        final pets = f['pets'];
+        final firstPet = (pets is List && pets.isNotEmpty) ? pets.first : null;
+        return FriendDogDisplay(
+          name:
+              firstPet?['name']?.toString() ??
+              f['pet_name']?.toString() ??
+              f['nickname']?.toString() ??
+              '친구',
+          profileImage: resolveMediaUrl(
+            (firstPet?['profile_image'] ?? f['profile_image_url'])?.toString(),
+          ),
+        );
+      }).toList();
+
+      final rawPersonalities = petData['personalities'];
+      final personalities = rawPersonalities is List
+          ? rawPersonalities
+                .map((p) => _personalityLabels[p.toString()] ?? p.toString())
+                .toList()
+          : <String>[];
 
       return HomeDashboardResponse(
-        userName: userData['nickname'] ?? '보호자님',
-        petId: petData['id'] ?? petId,
-        petName: petData['name'] ?? '반려견',
-        petBreed: petData['breed'] ?? '견종',
-        petAge: petData['age'] ?? 1,
+        userName: userData['nickname']?.toString() ?? '보호자님',
+        petId: petData['id'] ?? resolvedPetId,
+        petName: petData['name']?.toString() ?? '반려견',
+        petBreed: petData['breed']?.toString() ?? '견종',
+        petAge: _ageFrom(petData),
         petLevel: petData['level'] ?? 1,
-        petImageUrl: petData['profile_image'],
-        petPersonalities: List<String>.from(
-          petData['personalities'] ?? ['에너지형'],
-        ),
-        targetDistance: (petData['target_distance'] ?? 2.0).toDouble(),
-        currentDistance: (petData['current_distance'] ?? 0.0).toDouble(),
+        petImageUrl: resolveMediaUrl(petData['profile_image']?.toString()),
+        petPersonalities: personalities,
+        targetDistance: (petData['target_distance'] as num?)?.toDouble() ?? 2.0,
+        currentDistance:
+            (petData['current_distance'] as num?)?.toDouble() ?? 0.0,
         walkingFriends: friendList,
         dailyMissions: missionList,
       );
+    } on ApiException {
+      rethrow;
     } catch (e) {
       throw Exception('홈 데이터 로드 실패: $e');
     }
@@ -353,7 +567,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/walks/start/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _headers(),
         body: jsonEncode({
           'pet': petId,
           'is_location_shared': isLocationShared,
@@ -398,7 +612,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/walks/$walkId/end/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _headers(),
       );
 
       final body = jsonDecode(response.body);
@@ -432,10 +646,7 @@ class ApiService {
     try {
       final res = await http.patch(
         Uri.parse('$baseUrl/api/walks/$walkId/location-share/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
         body: jsonEncode({'is_location_shared': isLocationShared}),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -464,10 +675,7 @@ class ApiService {
     try {
       final res = await http.patch(
         Uri.parse('$baseUrl/api/walks/$walkId/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
         body: jsonEncode({'status': status}),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -496,10 +704,7 @@ class ApiService {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/walks/$walkId/locations/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
         body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -534,10 +739,7 @@ class ApiService {
     try {
       final res = await http.get(
         Uri.parse('$baseUrl/api/walks/$walkId/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
@@ -555,6 +757,11 @@ class ApiService {
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
+      await saveSession(
+        access: 'mock_access_token',
+        refresh: 'mock_refresh_token',
+        userId: '1',
+      );
       return {
         'success': true,
         'access': 'mock_access_token',
@@ -567,11 +774,24 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final bool success = response.statusCode == 200;
+      // 기존엔 토큰을 받기만 하고 어디에도 저장하지 않아서
+      // 이후 모든 API가 Authorization 없이 나가 401이 발생했음
+      if (success) {
+        await saveSession(
+          access: data['access']?.toString(),
+          refresh: data['refresh']?.toString(),
+          userId: data['user_id']?.toString(),
+        );
+      }
       return {
-        'success': response.statusCode == 200,
+        'success': success,
         'access': data['access'],
         'refresh': data['refresh'],
+        'user_id': data['user_id'],
+        if (!success && data is Map && data['detail'] != null)
+          'message': data['detail'].toString(),
       };
     } catch (e) {
       return {'success': false, 'message': '서버 연결 실패'};
@@ -598,11 +818,20 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'access_token': accessToken}),
       );
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final bool success = response.statusCode == 200;
+      if (success) {
+        await saveSession(
+          access: data['access']?.toString(),
+          refresh: data['refresh']?.toString(),
+          userId: data['user_id']?.toString(),
+        );
+      }
       return {
-        'success': response.statusCode == 200,
+        'success': success,
         'access': data['access'],
         'refresh': data['refresh'],
+        'user_id': data['user_id'] ?? await getUserId(),
         'is_new': data['is_new'] ?? false,
       };
     } catch (e) {
@@ -660,7 +889,7 @@ class ApiService {
     String email,
     String password,
     String passwordConfirm,
-    String verificationToken, // 추가됨
+    String code,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -679,7 +908,7 @@ class ApiService {
           'email': email,
           'password': password,
           'password2': passwordConfirm,
-          'verification_token': verificationToken, // 백엔드 명세에 맞춤
+          'code': code,
         }),
       );
       final data = jsonDecode(response.body);
@@ -763,11 +992,21 @@ class ApiService {
         );
       }
 
-      var response = await request.send();
+      final response = await http.Response.fromStream(await request.send());
+      final bool success =
+          response.statusCode == 200 || response.statusCode == 201;
 
-      return {
-        'success': response.statusCode == 200 || response.statusCode == 201,
-      };
+      // 등록된 반려견 id를 저장해두면 홈 화면에서 pet_id를 하드코딩할 필요가 없음
+      if (success) {
+        try {
+          final body = jsonDecode(utf8.decode(response.bodyBytes));
+          final rawId = body is Map ? (body['id'] ?? body['data']?['id']) : null;
+          final petId = int.tryParse(rawId?.toString() ?? '');
+          if (petId != null) await savePetId(petId);
+        } catch (_) {}
+      }
+
+      return {'success': success};
     } catch (e) {
       return {'success': false};
     }
@@ -876,10 +1115,7 @@ class ApiService {
     try {
       final res = await http.get(
         Uri.parse('$baseUrl/api/attendance/summary/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200) {
         return AttendanceSummaryResponse.fromJson(jsonDecode(res.body));
@@ -942,10 +1178,7 @@ class ApiService {
     try {
       final res = await http.get(
         Uri.parse('$baseUrl/api/attendance/calendar/?year=$year&month=$month'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200) {
         return AttendanceCalendarResponse.fromJson(jsonDecode(res.body));
@@ -1005,10 +1238,7 @@ class ApiService {
     try {
       final res = await http.get(
         Uri.parse('$baseUrl/api/attendance/rewards/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200) {
         final List list = jsonDecode(res.body);
@@ -1044,10 +1274,7 @@ class ApiService {
     try {
       final res = await http.patch(
         Uri.parse('$baseUrl/api/attendance/rewards/$rewardId/open/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
         return AttendanceRewardItem.fromJson(jsonDecode(res.body));
@@ -1068,15 +1295,13 @@ class ApiService {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/friends/qr/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _headers(token: token),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
-        return QrCodeGenerateResponse.fromJson(jsonDecode(res.body));
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        return QrCodeGenerateResponse.fromJson(data);
       }
-      throw Exception('QR 코드 생성 실패');
+      throw ApiException(res.statusCode, 'QR 코드 생성 실패');
     } catch (e) {
       throw Exception('서버 연결 실패: $e');
     }
@@ -1090,20 +1315,77 @@ class ApiService {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/api/friends/qr/redeem/'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'token': qrToken}),
+        headers: await _headers(token: token),
+        body: jsonEncode({'token': qrToken.trim()}),
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
-        final data = jsonDecode(res.body);
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
         final friendJson = data['friend'] ?? data;
         return Friend.fromJson(friendJson);
       }
-      throw Exception('친구 추가 실패');
+      String errorMsg = '친구 추가 실패';
+      try {
+        final errData = jsonDecode(utf8.decode(res.bodyBytes));
+        if (errData is Map && errData['detail'] != null) {
+          errorMsg = errData['detail'].toString();
+        } else if (errData is Map && errData['message'] != null) {
+          errorMsg = errData['message'].toString();
+        }
+      } catch (_) {}
+      throw ApiException(res.statusCode, errorMsg);
     } catch (e) {
       throw Exception('서버 연결 실패: $e');
+    }
+  }
+
+  // [토큰 갱신 API (POST api/users/token/refresh/)]
+  static Future<String?> refreshAccessToken() async {
+    final refresh = await storage.read(key: _kRefreshToken);
+    if (refresh == null || refresh.isEmpty) return null;
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/users/token/refresh/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': refresh}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        final newAccess = data['access']?.toString();
+        if (newAccess != null) {
+          await storage.write(key: _kAccessToken, value: newAccess);
+          return newAccess;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // [내 반려견 목록 조회 API (GET api/pets/)]
+  static Future<List<Map<String, dynamic>>> getMyPets() async {
+    if (useMockData) {
+      return [
+        {
+          'id': 1,
+          'name': '두부',
+          'breed': '말티즈',
+          'level': 1,
+          'experience': 0,
+          'profile_image': null,
+        }
+      ];
+    }
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/pets/'),
+        headers: await _headers(),
+      );
+      if (res.statusCode == 200) {
+        final list = _asList(jsonDecode(utf8.decode(res.bodyBytes)));
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
   }
 }

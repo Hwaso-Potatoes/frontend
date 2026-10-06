@@ -1,5 +1,7 @@
 // lib/models/dog_model.dart
 
+import '../config/api_config.dart';
+
 // ── 백엔드 연결 시 확인/요청해야 할 것 (나중에 물어볼 목록) ──
 // 1. personalities 필드에 들어오는 전체 값 목록 (지금 확인된 건 "energy" 뿐)
 // 2. "권장 산책 거리"(monthlyWalkGoal) 값을 어디서 받아올지
@@ -77,8 +79,8 @@ final DogModel dummyDog = DogModel(
 
   badgeCount: 3,
   ownedBadgeImagePaths: [
-    'http://127.0.0.1:8000/media/badges/example1.png',
-    'http://127.0.0.1:8000/media/badges/example2.png',
-    'http://127.0.0.1:8000/media/badges/example3.png',
+    '$kApiBaseUrl/media/badges/example1.png',
+    '$kApiBaseUrl/media/badges/example2.png',
+    '$kApiBaseUrl/media/badges/example3.png',
   ],
 );

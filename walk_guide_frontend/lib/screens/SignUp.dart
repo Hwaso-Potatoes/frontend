@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/api_service.dart';
@@ -19,6 +20,7 @@ class _SignUpState extends State<SignUp> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final TextEditingController _codeController = TextEditingController();
+  final storage = const FlutterSecureStorage();
 
   bool _isLoading = false;
   bool _isRequestingCode = false;
@@ -223,8 +225,12 @@ class _SignUpState extends State<SignUp> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
+    final code = _codeController.text.trim(); // 💡 새로 추가
 
-    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty ||
+        code.isEmpty) {
       _showStyledDialog('입력 오류', '모든 필드를 입력해주세요.');
       return;
     }
@@ -239,11 +245,6 @@ class _SignUpState extends State<SignUp> {
       return;
     }
 
-    if (!_isCodeVerified || _verificationToken.isEmpty) {
-      _showStyledDialog('인증 필요', '이메일 인증을 먼저 완료해주세요.');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
@@ -251,16 +252,23 @@ class _SignUpState extends State<SignUp> {
         email,
         password,
         confirmPassword,
-        _verificationToken,
+        code,
       );
 
       if (signUpResult['success'] == true) {
+        final String userId = signUpResult['id']?.toString() ?? '1';
+        final String accessToken = signUpResult['access'] ?? '';
+        final String refreshToken = signUpResult['refresh'] ?? '';
+
+        await ApiService.saveSession(
+          access: accessToken,
+          refresh: refreshToken,
+          userId: userId,
+        );
+
         setState(() => _isLoading = false);
 
         if (!mounted) return;
-
-        final String userId = signUpResult['id']?.toString() ?? '1';
-        final String accessToken = signUpResult['access'] ?? '';
 
         Navigator.push(
           context,
@@ -269,6 +277,9 @@ class _SignUpState extends State<SignUp> {
                 SignUpInfo1(userId: userId, accessToken: accessToken),
           ),
         );
+      } else {
+        setState(() => _isLoading = false);
+        _showStyledDialog('오류', signUpResult['message'] ?? '회원가입에 실패했습니다.');
       }
     } catch (e) {
       setState(() => _isLoading = false);

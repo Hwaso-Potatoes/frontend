@@ -45,6 +45,8 @@ dependencies:
   google_sign_in: ^6.1.5
   sign_in_with_apple: ^8.2.0
   image_picker: ^1.2.3
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
