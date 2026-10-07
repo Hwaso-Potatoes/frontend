@@ -494,9 +494,10 @@ class ApiService {
         }
       }
 
-      final missionList = optionalList(responses[2], '미션')
-          .map((m) => PetMissionItem.fromJson(m as Map<String, dynamic>))
-          .toList();
+      final missionList = optionalList(
+        responses[2],
+        '미션',
+      ).map((m) => PetMissionItem.fromJson(m as Map<String, dynamic>)).toList();
       final friendList = optionalList(responses[3], '친구').map((f) {
         // GET api/friends/ 응답: { id, nickname, pets: [{ id, name, breed }] }
         final pets = f['pets'];
@@ -884,12 +885,12 @@ class ApiService {
     }
   }
 
-  // 회원가입 - 3. 최종 회원가입 API (verification_token 포함)
+  // 회원가입 - 3. 최종 회원가입 API
   static Future<Map<String, dynamic>> signUp(
     String email,
     String password,
     String passwordConfirm,
-    String code,
+    String verificationToken,
   ) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -908,7 +909,7 @@ class ApiService {
           'email': email,
           'password': password,
           'password2': passwordConfirm,
-          'code': code,
+          'verification_token': verificationToken,
         }),
       );
       final data = jsonDecode(response.body);
@@ -1000,7 +1001,9 @@ class ApiService {
       if (success) {
         try {
           final body = jsonDecode(utf8.decode(response.bodyBytes));
-          final rawId = body is Map ? (body['id'] ?? body['data']?['id']) : null;
+          final rawId = body is Map
+              ? (body['id'] ?? body['data']?['id'])
+              : null;
           final petId = int.tryParse(rawId?.toString() ?? '');
           if (petId != null) await savePetId(petId);
         } catch (_) {}
@@ -1371,7 +1374,7 @@ class ApiService {
           'level': 1,
           'experience': 0,
           'profile_image': null,
-        }
+        },
       ];
     }
     try {

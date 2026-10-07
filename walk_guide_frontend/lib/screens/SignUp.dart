@@ -225,12 +225,8 @@ class _SignUpState extends State<SignUp> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
-    final code = _codeController.text.trim(); // 💡 새로 추가
 
-    if (email.isEmpty ||
-        password.isEmpty ||
-        confirmPassword.isEmpty ||
-        code.isEmpty) {
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       _showStyledDialog('입력 오류', '모든 필드를 입력해주세요.');
       return;
     }
@@ -245,6 +241,11 @@ class _SignUpState extends State<SignUp> {
       return;
     }
 
+    if (!_isCodeVerified || _verificationToken.isEmpty) {
+      _showStyledDialog('인증 필요', '이메일 인증을 먼저 완료해주세요.');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -252,7 +253,7 @@ class _SignUpState extends State<SignUp> {
         email,
         password,
         confirmPassword,
-        code,
+        _verificationToken,
       );
 
       if (signUpResult['success'] == true) {

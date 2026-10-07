@@ -13,11 +13,11 @@
 /// 백엔드 API/미디어 공통 base URL (끝에 '/' 붙이지 말 것)
 const String kApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://localhost',
+  defaultValue: 'https://hwaso-potatoes-backend.onrender.com',
 );
 
 /// true면 ApiService가 실제 서버 대신 목 데이터를 반환
-const bool kUseMockData = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+const bool kUseMockData = bool.fromEnvironment('USE_MOCK', defaultValue: false);
 
 /// 백엔드가 "/media/..." 같은 상대경로를 내려주는 경우가 있어서(accessory 응답 등)
 /// 화면에 띄우기 전에 절대 URL로 바꿔주는 헬퍼.
