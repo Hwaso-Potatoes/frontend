@@ -17,13 +17,13 @@ import '../../models/decoration_model.dart';
 /// z-order: 왼쪽(맨뒤) -> 오른쪽(중간) -> 가운데(맨앞, 메인 언덕)
 class DogStage extends StatelessWidget {
   final String dogBreed;
-  final AccessoryItem? equippedHair;
+  final EquippedAccessories equipped;
   final double characterScale;
 
   const DogStage({
     super.key,
     required this.dogBreed,
-    this.equippedHair,
+    this.equipped = const EquippedAccessories(),
     this.characterScale = 1,
   });
 
@@ -99,7 +99,7 @@ class DogStage extends StatelessWidget {
                   child: DogCharacter(
                     breed: dogBreed,
                     size: s(256 * characterScale),
-                    equippedHair: equippedHair,
+                    equipped: equipped,
                   ),
                 ),
               ],

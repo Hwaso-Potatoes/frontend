@@ -27,6 +27,9 @@ const Map<String, String> _koreanBreedToKey = {
   '시츄': 'shih_tzu',
 };
 
+String dogBreedKey(String breed) =>
+    _koreanBreedToKey[breed.trim()] ?? breed.trim().toLowerCase();
+
 /// 백엔드의 breed 값(key) → 로컬 에셋 경로(value) 매핑
 /// 전부 png (svg가 사실 래스터 이미지를 감싼 것들이라 png로 교체함)
 final Map<String, String> dogAssetMap = {
@@ -55,15 +58,11 @@ class DogIcon extends StatelessWidget {
   final String breed;
   final double size;
 
-  const DogIcon({
-    super.key,
-    required this.breed,
-    this.size = 48,
-  });
+  const DogIcon({super.key, required this.breed, this.size = 48});
 
   @override
   Widget build(BuildContext context) {
-    final String key = _koreanBreedToKey[breed] ?? breed.toLowerCase();
+    final String key = dogBreedKey(breed);
     final assetPath = dogAssetMap[key];
 
     if (assetPath == null) {

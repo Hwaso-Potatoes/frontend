@@ -47,9 +47,11 @@ class _BadgeBookScreenState extends State<BadgeBookScreen> {
 
     setState(() {
       _badges = master
-          .map((b) => ownedIds.contains(b.id)
-              ? b.copyWith(isOwned: true, acquiredAt: DateTime.now())
-              : b)
+          .map(
+            (b) => ownedIds.contains(b.id)
+                ? b.copyWith(isOwned: true, acquiredAt: DateTime.now())
+                : b,
+          )
           .toList();
       _isLoading = false;
     });
@@ -150,10 +152,12 @@ class _BadgeGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = <List<BadgeModel>>[];
     for (var i = 0; i < badges.length; i += _colCount) {
-      rows.add(badges.sublist(
-        i,
-        (i + _colCount > badges.length) ? badges.length : i + _colCount,
-      ));
+      rows.add(
+        badges.sublist(
+          i,
+          (i + _colCount > badges.length) ? badges.length : i + _colCount,
+        ),
+      );
     }
 
     return Column(
@@ -163,19 +167,13 @@ class _BadgeGrid extends StatelessWidget {
             children: [
               for (var c = 0; c < rows[r].length; c++) ...[
                 if (c != 0) const SizedBox(width: _hSpacing),
-                _BadgeCell(
-                  badge: rows[r][c],
-                  onTap: () => onTap(rows[r][c]),
-                ),
+                _BadgeCell(badge: rows[r][c], onTap: () => onTap(rows[r][c])),
               ],
             ],
           ),
           if (r != rows.length - 1) ...[
             const SizedBox(height: 20),
-            Container(
-              height: 1,
-              color: _kNeutralGrayKhaki.withOpacity(0.5),
-            ),
+            Container(height: 1, color: _kNeutralGrayKhaki.withOpacity(0.5)),
             const SizedBox(height: 29),
           ],
         ],
@@ -208,17 +206,37 @@ class _BadgeCell extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(9),
         child: badge.isOwned
-            ? BadgeIcon(imageUrl: badge.image, size: 54)
+            ? BadgeIcon(badgeId: badge.id, imageUrl: badge.image, size: 54)
             : Opacity(
                 opacity: 0.45,
                 child: ColorFiltered(
                   colorFilter: const ColorFilter.matrix(<double>[
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0, 0, 0, 1, 0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
                   ]),
-                  child: BadgeIcon(imageUrl: badge.image, size: 54),
+                  child: BadgeIcon(
+                    badgeId: badge.id,
+                    imageUrl: badge.image,
+                    size: 54,
+                  ),
                 ),
               ),
       ),
@@ -279,25 +297,46 @@ class _BadgeDetailModal extends StatelessWidget {
               width: 254,
               height: 254,
               child: badge.isOwned
-                  ? BadgeIcon(imageUrl: badge.image, size: 254)
+                  ? BadgeIcon(
+                      badgeId: badge.id,
+                      imageUrl: badge.image,
+                      size: 254,
+                    )
                   : Opacity(
                       opacity: 0.45,
                       child: ColorFiltered(
                         colorFilter: const ColorFilter.matrix(<double>[
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0, 0, 0, 1, 0,
+                          0.2126,
+                          0.7152,
+                          0.0722,
+                          0,
+                          0,
+                          0.2126,
+                          0.7152,
+                          0.0722,
+                          0,
+                          0,
+                          0.2126,
+                          0.7152,
+                          0.0722,
+                          0,
+                          0,
+                          0,
+                          0,
+                          0,
+                          1,
+                          0,
                         ]),
-                        child: BadgeIcon(imageUrl: badge.image, size: 254),
+                        child: BadgeIcon(
+                          badgeId: badge.id,
+                          imageUrl: badge.image,
+                          size: 254,
+                        ),
                       ),
                     ),
             ),
             const SizedBox(height: 16),
-            Container(
-              height: 1,
-              color: _kNeutralGrayKhaki.withOpacity(0.5),
-            ),
+            Container(height: 1, color: _kNeutralGrayKhaki.withOpacity(0.5)),
             const SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

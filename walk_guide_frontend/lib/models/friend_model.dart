@@ -1,3 +1,5 @@
+import 'decoration_model.dart';
+
 // lib/models/friend_model.dart
 
 // ── 백엔드 연결 시 확인/요청해야 할 것 (추후 논의사항, 지우지 말 것) ──
@@ -23,6 +25,7 @@ class FriendPet {
   final String name;
   final String breed;
 
+  final EquippedAccessories equipped;
   final int? age;
   final List<String> personalityTags;
   const FriendPet({
@@ -30,6 +33,7 @@ class FriendPet {
     required this.name,
     required this.breed,
     this.age,
+    this.equipped = const EquippedAccessories(),
     this.personalityTags = const [],
   });
 

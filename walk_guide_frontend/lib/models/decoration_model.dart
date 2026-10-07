@@ -1,18 +1,5 @@
 // lib/models/decoration_model.dart
 
-import 'package:flutter/material.dart';
-
-// ── 백엔드/디자인팀 확인 필요 목록 ──
-// 1. (디자인팀) 헤어/케이프/옷/신발 오버레이용 "품종별 앵커 좌표(x,y,scale)" 필요
-//    -> 지금은 전 품종 공통 임시 좌표(비율 추정치)로 처리, 나중에 세분화 필요
-// 2. (기획) 그리드에서 "장착 중"인 아이템을 시각적으로 구분해야 하는지 확인 필요
-//    -> 지금은 스타일 처리 없음, isEquipped 값만 상태로 관리
-// 3. (backend) "미보유" 악세사리까지 다 보여주려면 "전체 악세사리 카탈로그 조회" API 필요
-//    -> 지금 확인된 "보유 액세서리 조회"는 가진 것만 옴 (그래서 아래 더미 중 isOwned:false
-//       항목들은 실제 API로는 채울 방법이 아직 없음, 그리드 표시 확인용으로만 존재)
-// 4. (backend) category 값이 "HAIR"만 확인됨. CAPE/CLOTHES/SHOES도 같은 패턴(대문자)인지
-//    확인 필요 -> 지금은 그렇다고 가정하고 매핑함
-
 enum AccessoryCategory { hair, cape, clothes, shoes }
 
 extension AccessoryCategoryLabel on AccessoryCategory {
@@ -31,7 +18,6 @@ extension AccessoryCategoryLabel on AccessoryCategory {
 }
 
 /// 백엔드 category 문자열("HAIR" 등) -> enum 변환
-/// TODO(backend): HAIR 말고 나머지 3개 값도 대문자로 오는지 확인 필요, 지금은 가정함
 AccessoryCategory accessoryCategoryFromString(String value) {
   switch (value.toUpperCase()) {
     case 'HAIR':
@@ -48,21 +34,50 @@ AccessoryCategory accessoryCategoryFromString(String value) {
   }
 }
 
-/// 악세사리 오버레이 앵커 (강아지 이미지 크기 대비 비율 위치 + 배율)
-/// TODO(디자인팀): 품종별로 다르게 받아야 함, 지금은 전 품종 공통 임시값
-class AccessoryAnchor {
-  final Offset position; // 0.0~1.0 비율 (강아지 이미지 박스 기준)
-  final double scale; // 강아지 이미지 너비 대비 악세사리 크기 비율
-
-  const AccessoryAnchor({required this.position, required this.scale});
+/// Designer coordinates use the full 350 x 350 dog canvas.
+class AccessoryPlacement {
+  final double xPercent, yPercent, sizePercent, rotationDegrees;
+  const AccessoryPlacement(
+    this.xPercent,
+    this.yPercent, {
+    this.sizePercent = 100,
+    this.rotationDegrees = 0,
+  });
+  double get scale => (sizePercent == 0 ? 100 : sizePercent) / 100;
 }
 
-const Map<AccessoryCategory, AccessoryAnchor> defaultAnchors = {
-  AccessoryCategory.hair: AccessoryAnchor(position: Offset(0.5, 0.08), scale: 0.32),
-  AccessoryCategory.cape: AccessoryAnchor(position: Offset(0.5, 0.38), scale: 0.42),
-  AccessoryCategory.clothes: AccessoryAnchor(position: Offset(0.5, 0.55), scale: 0.5),
-  AccessoryCategory.shoes: AccessoryAnchor(position: Offset(0.5, 0.9), scale: 0.3),
-};
+class DogAccessoryLayout {
+  final AccessoryPlacement hat, pin, cape, clothes, shoes;
+  const DogAccessoryLayout({
+    required this.hat,
+    required this.pin,
+    required this.cape,
+    required this.clothes,
+    required this.shoes,
+  });
+}
+
+/// Snapshot of equipped state; no HTTP or mutable list state in the renderer.
+class EquippedAccessories {
+  final AccessoryItem? hair, cape, clothes, shoes;
+  const EquippedAccessories({this.hair, this.cape, this.clothes, this.shoes});
+  factory EquippedAccessories.fromItems(Iterable<AccessoryItem> items) {
+    final selected = <AccessoryCategory, AccessoryItem>{};
+    for (final item in items.where((item) => item.isEquipped)) {
+      selected[item.category] = item;
+    }
+    return EquippedAccessories(
+      hair: selected[AccessoryCategory.hair],
+      cape: selected[AccessoryCategory.cape],
+      clothes: selected[AccessoryCategory.clothes],
+      shoes: selected[AccessoryCategory.shoes],
+    );
+  }
+}
+
+extension AccessoryCategoryApi on AccessoryCategory {
+  String get apiValue => name.toUpperCase();
+}
 
 /// 악세사리 아이템 하나
 ///
@@ -98,7 +113,9 @@ class AccessoryItem {
       accessoryId: accessoryJson['id'] as int,
       name: accessoryJson['name'] as String,
       image: accessoryJson['image'] as String,
-      category: accessoryCategoryFromString(accessoryJson['category'] as String),
+      category: accessoryCategoryFromString(
+        accessoryJson['category'] as String,
+      ),
       isOwned: true, // 이 API는 보유한 것만 내려주므로 항상 true
       isEquipped: json['is_equipped'] as bool,
     );

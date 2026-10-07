@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../models/accessory_render_catalog.dart';
+import '../asset_viewport.dart';
 
 /// 서버에서 내려주는 액세서리 image URL을 보여주는 위젯
 /// - category(HAIR, HAT 등)는 지금 당장은 안 써도, 나중에
@@ -28,13 +30,46 @@ class AccessoryIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return SizedBox(
-        width: size,
-        height: size,
-        child: _buildPlaceholder(),
-      );
+      return SizedBox(width: size, height: size, child: _buildPlaceholder());
     }
 
+    if (imageUrl!.startsWith('assets/')) {
+      for (final spec in accessoryRenderCatalog.values) {
+        if (spec.asset == imageUrl) {
+          final aspect =
+              spec.thumbnailBounds.width / spec.thumbnailBounds.height;
+          // Hair previews retain more breathing room; wearing size is separate.
+          final preferredSize = spec.hairType == HairRenderType.pin
+              ? size * 0.42
+              : spec.hairType == HairRenderType.hat
+              ? size * 0.65
+              : size;
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final thumbnailSize = preferredSize
+                  .clamp(0.0, constraints.maxWidth)
+                  .clamp(0.0, constraints.maxHeight);
+              return Center(
+                child: AssetViewport(
+                  asset: spec.asset,
+                  canvas: spec.canvasSize,
+                  frame: spec.thumbnailBounds,
+                  width: aspect >= 1 ? thumbnailSize : thumbnailSize * aspect,
+                  height: aspect >= 1 ? thumbnailSize / aspect : thumbnailSize,
+                ),
+              );
+            },
+          );
+        }
+      }
+      return Image.asset(
+        imageUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (_, error, stack) => _buildPlaceholder(),
+      );
+    }
     return Image.network(
       imageUrl!,
       width: size,
@@ -45,17 +80,11 @@ class AccessoryIcon extends StatelessWidget {
         return SizedBox(
           width: size,
           height: size,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        return SizedBox(
-          width: size,
-          height: size,
-          child: _buildPlaceholder(),
-        );
+        return SizedBox(width: size, height: size, child: _buildPlaceholder());
       },
     );
   }

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../models/dog_model.dart';
 import '../models/decoration_model.dart';
+import '../models/accessory_render_catalog.dart';
 import '../widgets/decoration/category_tabs.dart';
 import '../widgets/decoration/accessory_grid.dart';
 import '../widgets/decoration/dog_stage.dart';
@@ -31,48 +32,40 @@ class _DecorationScreenState extends State<DecorationScreen> {
   @override
   void initState() {
     super.initState();
-    _items = List.of(dummyAccessories);
+    _items = List.of(previewAccessories);
 
-    final String? nameToFind =
-        widget.initialAccessoryName ?? widget.initialAccessoryItem?.name;
-    if (nameToFind != null && nameToFind.isNotEmpty) {
-      int foundIndex = _items.indexWhere((item) => item.name.contains(nameToFind) || nameToFind.contains(item.name));
-      if (foundIndex != -1) {
-        final target = _items[foundIndex];
-        _selectedCategory = target.category;
-        _items = _items.map((item) {
-          if (item.category == target.category) {
-            return item.copyWith(isEquipped: item.accessoryId == target.accessoryId);
-          }
-          return item;
-        }).toList();
-      } else {
-        final newItem = AccessoryItem(
-          ownershipId: 99,
-          accessoryId: 99,
-          name: nameToFind,
-          image: '',
-          category: AccessoryCategory.hair,
-          isOwned: true,
-          isEquipped: true,
-        );
-        _items.insert(0, newItem);
-        _selectedCategory = AccessoryCategory.hair;
+    AccessoryItem? initial = widget.initialAccessoryItem;
+    // Legacy reward callers supply a display name only. Resolve an existing
+    // record; never fabricate an ID, empty image, category or render subtype.
+    if (initial == null && widget.initialAccessoryName != null) {
+      for (final item in [...previewAccessories, ...dummyAccessories]) {
+        if (item.name == widget.initialAccessoryName) {
+          initial = item;
+          break;
+        }
       }
+    }
+    if (initial != null) {
+      final target = initial;
+      _selectedCategory = target.category;
+      final alreadyListed = _items.any(
+        (item) => item.accessoryId == target.accessoryId,
+      );
+      _items = _items
+          .map(
+            (item) => item.accessoryId == target.accessoryId
+                ? target.copyWith(isEquipped: true)
+                : item.category == target.category
+                ? item.copyWith(isEquipped: false)
+                : item,
+          )
+          .toList();
+      if (!alreadyListed) _items.add(target.copyWith(isEquipped: true));
     }
   }
 
   List<AccessoryItem> get _filteredItems =>
       _items.where((item) => item.category == _selectedCategory).toList();
-
-  AccessoryItem? get _equippedHair {
-    for (final item in _items) {
-      if (item.category == AccessoryCategory.hair && item.isEquipped) {
-        return item;
-      }
-    }
-    return null;
-  }
 
   void _handleTap(AccessoryItem tapped) {
     setState(() {
@@ -140,7 +133,8 @@ class _DecorationScreenState extends State<DecorationScreen> {
                   final double availableWidth = constraints.maxWidth;
 
                   // 언덕이 실제로 렌더링될 높이 (AspectRatio 402:430 기준)
-                  final double hillRenderedHeight = availableWidth *
+                  final double hillRenderedHeight =
+                      availableWidth *
                       (DogStage.designHeight / DogStage.designWidth);
 
                   // 시트 시작점(원본 404, 90만큼 당겼으니 314)을
@@ -157,7 +151,7 @@ class _DecorationScreenState extends State<DecorationScreen> {
                         right: 0,
                         child: DogStage(
                           dogBreed: dog.breed,
-                          equippedHair: _equippedHair,
+                          equipped: EquippedAccessories.fromItems(_items),
                         ),
                       ),
                       // 시트: 언덕 아래쪽과 겹치며 화면 끝까지 채움
@@ -190,7 +184,9 @@ class _DecorationScreenState extends State<DecorationScreen> {
                                 CategoryTabs(
                                   selected: _selectedCategory,
                                   onChanged: (category) {
-                                    setState(() => _selectedCategory = category);
+                                    setState(
+                                      () => _selectedCategory = category,
+                                    );
                                   },
                                 ),
                                 const SizedBox(height: 25),

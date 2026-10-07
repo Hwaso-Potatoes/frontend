@@ -95,101 +95,25 @@ class BadgeModel {
   // ---------------------------------------------------------------------
   static List<BadgeModel> dummyMasterList() {
     return const [
-      BadgeModel(
-        id: 1,
-        name: '첫 친구',
-        description: '처음 친구추가시 획득',
-      ),
-      BadgeModel(
-        id: 2,
-        name: '진화의 달인',
-        description: 'LV.50 달성시 획득',
-      ),
-      BadgeModel(
-        id: 3,
-        name: '완전 진화',
-        description: '최종 단계까지 진화시 획득',
-      ),
-      BadgeModel(
-        id: 4,
-        name: '성장의 증표',
-        description: '레벨 10 달성시 획득',
-      ),
-      BadgeModel(
-        id: 5,
-        name: '첫 산책',
-        description: '첫 산책 시작시 획득',
-      ),
-      BadgeModel(
-        id: 6,
-        name: '5시간 산책',
-        description: '누적 산책시간 5시간 달성시 획득',
-      ),
-      BadgeModel(
-        id: 7,
-        name: '10시간 산책',
-        description: '누적 산책시간 10시간 달성시 획득',
-      ),
-      BadgeModel(
-        id: 8,
-        name: '50시간 산책',
-        description: '누적 산책시간 50시간 달성시 획득',
-      ),
-      BadgeModel(
-        id: 9,
-        name: '5km 산책',
-        description: '누적 5km 산책시 획득',
-      ),
-      BadgeModel(
-        id: 10,
-        name: '50km 산책',
-        description: '누적 50km 산책시 획득',
-      ),
-      BadgeModel(
-        id: 11,
-        name: '100km 산책',
-        description: '누적 100km 산책시 획득',
-      ),
-      BadgeModel(
-        id: 12,
-        name: '500km 산책',
-        description: '누적 500km 산책시 획득',
-      ),
-      BadgeModel(
-        id: 13,
-        name: '첫날 산책',
-        description: '가입 첫날 산책 완료시 획득',
-      ),
-      BadgeModel(
-        id: 14,
-        name: '3일 연속 산책',
-        description: '3일 연속 산책시 획득',
-      ),
-      BadgeModel(
-        id: 15,
-        name: '매일 산책러',
-        description: '연속 산책 기록 달성시 획득',
-      ),
-      BadgeModel(
-        id: 16,
-        name: '1주 연속 산책',
-        description: '7일 연속 산책시 획득',
-      ),
-      BadgeModel(
-        id: 17,
-        name: '새로운 장소',
-        description: '새로운 산책 장소 방문시 획득',
-      ),
-      BadgeModel(
-        id: 18,
-        name: '탐험가',
-        description: '여러 장소 방문시 획득',
-      ),
-      BadgeModel(
-        id: 19,
-        name: '도시 탐험',
-        description: '도심 코스 산책 완료시 획득',
-      ),
+      BadgeModel(id: 1, name: '첫 친구', description: '첫 친구 추가'),
+      BadgeModel(id: 2, name: '진화의 달인', description: '레벨 50 달성'),
+      BadgeModel(id: 3, name: '촉촉한 발자국', description: '비 오는 날 산책'),
+      BadgeModel(id: 4, name: '눈길 탐험가', description: '눈 오는 날 산책'),
+      BadgeModel(id: 5, name: '시동걸기', description: '누적 산책 60분'),
+      BadgeModel(id: 6, name: '산책의 맛', description: '누적 산책 300분'),
+      BadgeModel(id: 7, name: '산책 중독', description: '누적 산책 600분'),
+      BadgeModel(id: 8, name: '산책의 달인', description: '누적 산책 3000분'),
+      BadgeModel(id: 9, name: '가벼운 발걸음', description: '누적 산책 거리 5km'),
+      BadgeModel(id: 10, name: '마라토너', description: '누적 산책 거리 10km'),
+      BadgeModel(id: 11, name: '끝없는 발자국', description: '누적 산책 거리 30km'),
+      BadgeModel(id: 12, name: '정복왕', description: '누적 산책 거리 50km'),
+      BadgeModel(id: 13, name: '첫 발자국', description: '첫 산책'),
+      BadgeModel(id: 14, name: '출석왕', description: '30일 연속 산책'),
+      BadgeModel(id: 15, name: '삼시세끼 산책', description: '하루 산책 3회'),
+      BadgeModel(id: 16, name: '주간 완주왕', description: '7일 연속 산책'),
+      BadgeModel(id: 17, name: '낯선 산책', description: '새로운 지역 산책'),
+      BadgeModel(id: 18, name: '숲길 탐험가', description: '숲속 산책'),
+      BadgeModel(id: 19, name: '도시 여행자', description: '도시 산책'),
     ];
   }
 }

@@ -1,3 +1,4 @@
+import '../models/decoration_model.dart';
 import 'package:flutter/material.dart';
 import '../models/friend_model.dart';
 import 'decoration/dog_stage.dart';
@@ -68,6 +69,7 @@ class _FriendDetailDialogState extends State<FriendDetailDialog> {
                 bottom: 50,
                 child: DogStage(
                   dogBreed: pet?.breed ?? '',
+                  equipped: pet?.equipped ?? const EquippedAccessories(),
                   characterScale: .84,
                 ),
               ),
