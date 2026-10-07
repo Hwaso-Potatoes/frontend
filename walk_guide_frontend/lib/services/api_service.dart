@@ -115,9 +115,7 @@ class WalkData {
 
   factory WalkData.fromJson(Map<String, dynamic> json) {
     return WalkData(
-      id: json['id'] is int
-          ? json['id']
-          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      id: int.tryParse((json['id'] ?? json['walk_id'])?.toString() ?? '') ?? 0,
       userId: json['user'] is int
           ? json['user']
           : int.tryParse(json['user']?.toString() ?? '0') ?? 0,
@@ -185,50 +183,58 @@ class WalkReportData {
     required this.expToNextLevel,
     required this.expRatio,
     this.newBadge,
+    this.hasExperienceData = true,
+    this.hasCaloriesData = true,
   });
 
-  factory WalkReportData.fromJson(Map<String, dynamic> json) {
-    final pet = json['pet'] as Map<String, dynamic>? ?? {};
-    final walk = json['walk'] as Map<String, dynamic>? ?? json;
+  final bool hasExperienceData;
+  final bool hasCaloriesData;
 
-    final double distance = (walk['total_distance'] is num)
-        ? (walk['total_distance'] as num).toDouble()
-        : double.tryParse(walk['total_distance']?.toString() ?? '0.0') ?? 0.0;
-
-    final int expGained = walk['earned_exp'] is int
-        ? walk['earned_exp']
-        : int.tryParse(walk['earned_exp']?.toString() ?? '24') ?? 24;
-
-    final int nextExp = pet['exp_to_next_level'] is int
-        ? pet['exp_to_next_level']
-        : int.tryParse(pet['exp_to_next_level']?.toString() ?? '22') ?? 22;
-
-    final int currentExp = pet['current_exp'] is int
-        ? pet['current_exp']
-        : int.tryParse(pet['current_exp']?.toString() ?? '72') ?? 72;
-
-    final int maxExp = pet['max_exp'] is int
-        ? pet['max_exp']
-        : int.tryParse(pet['max_exp']?.toString() ?? '100') ?? 100;
-
-    final double calculatedRatio = maxExp > 0
-        ? (currentExp / maxExp).clamp(0.0, 1.0)
-        : 0.72;
-
+  factory WalkReportData.fromJson(
+    Map<String, dynamic> json, {
+    double? fallbackDistance,
+    String? fallbackDuration,
+    String? fallbackPetName,
+  }) {
+    Map<String, dynamic> asMap(dynamic value) =>
+        value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+    int? asInt(dynamic value) => int.tryParse(value?.toString() ?? '');
+    double? asDouble(dynamic value) => double.tryParse(value?.toString() ?? '');
+    final pet = asMap(json['pet']);
+    final nestedWalk = asMap(json['walk']);
+    final walk = nestedWalk.isEmpty ? json : nestedWalk;
+    final seconds = asInt(walk['total_duration']);
+    final duration =
+        walk['total_duration_str']?.toString() ??
+        (seconds == null
+            ? fallbackDuration ?? '00분 00초'
+            : '${seconds ~/ 60}분 ${seconds % 60}초');
+    final earned = asInt(walk['earned_exp'] ?? json['earned_exp']);
+    final next = asInt(pet['exp_to_next_level'] ?? json['exp_to_next_level']);
+    final current = asInt(pet['current_exp'] ?? json['current_exp']);
+    final max = asInt(pet['max_exp'] ?? json['max_exp']);
+    final suppliedRatio = asDouble(pet['exp_ratio'] ?? json['exp_ratio']);
+    final ratio =
+        suppliedRatio ??
+        (current != null && max != null && max > 0 ? current / max : null);
+    final calories = asInt(walk['calories'] ?? json['calories']);
+    final badge = asMap(json['new_badge']);
     return WalkReportData(
-      petName: pet['name']?.toString() ?? json['pet_name']?.toString() ?? '두부',
-      totalDistance: distance,
-      totalDurationStr: walk['total_duration_str']?.toString() ?? '00분 00초',
-      calories: walk['calories'] is int
-          ? walk['calories']
-          : int.tryParse(walk['calories']?.toString() ?? '') ??
-                (distance * 55).toInt().clamp(0, 999),
-      earnedExp: expGained,
-      expToNextLevel: nextExp,
-      expRatio: calculatedRatio,
-      newBadge: json['new_badge'] != null
-          ? BadgeData.fromJson(json['new_badge'])
-          : null,
+      petName:
+          pet['name']?.toString() ??
+          json['pet_name']?.toString() ??
+          fallbackPetName ??
+          '반려견',
+      totalDistance:
+          asDouble(walk['total_distance']) ?? fallbackDistance ?? 0.0,
+      totalDurationStr: duration,
+      calories: calories ?? 0,
+      earnedExp: earned ?? 0,
+      expToNextLevel: next ?? 0,
+      expRatio: (ratio ?? 0.0).clamp(0.0, 1.0).toDouble(),
+      hasExperienceData: earned != null && next != null && ratio != null,
+      hasCaloriesData: calories != null,
+      newBadge: badge.isEmpty ? null : BadgeData.fromJson(badge),
     );
   }
 }
@@ -239,8 +245,9 @@ class WalkReportData {
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+  final Map<String, dynamic>? responseBody;
 
-  ApiException(this.statusCode, this.message);
+  ApiException(this.statusCode, this.message, {this.responseBody});
 
   bool get isUnauthorized => statusCode == 401;
 
@@ -254,6 +261,22 @@ class ApiException implements Exception {
 class ApiService {
   static const String baseUrl = kApiBaseUrl;
   static const bool useMockData = kUseMockData;
+
+  /// API의 상대 미디어 경로를 서버 origin 기준으로 해석한다.
+  /// 앱 내부 asset 경로와 이미 완성된 HTTP(S) URL은 그대로 사용한다.
+  static String? resolveMediaUrl(String? value) {
+    final path = value?.trim();
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('assets/')) return path;
+    final uri = Uri.tryParse(path);
+    if (uri == null) return null;
+    if (uri.hasScheme) {
+      return uri.scheme == 'http' || uri.scheme == 'https'
+          ? uri.toString()
+          : null;
+    }
+    return Uri.parse(baseUrl).resolve('/').resolveUri(uri).toString();
+  }
 
   static const storage = FlutterSecureStorage();
 
@@ -333,16 +356,22 @@ class ApiService {
   static dynamic _decodeOrThrow(http.Response res, String label) {
     final text = utf8.decode(res.bodyBytes);
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      return text.isEmpty ? null : jsonDecode(text);
+      return text.trim().isEmpty ? null : jsonDecode(text);
     }
     String message = '$label 요청 실패 (${res.statusCode})';
+    Map<String, dynamic>? errorBody;
     try {
       final body = jsonDecode(text);
-      if (body is Map && body['detail'] != null) {
-        message = body['detail'].toString();
+      if (body is Map) {
+        errorBody = Map<String, dynamic>.from(body);
+        final detail = body['detail'] ?? body['message'];
+        message =
+            detail?.toString() ??
+            body.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+        if (message.isEmpty) message = '$label 요청 실패 (${res.statusCode})';
       }
     } catch (_) {}
-    throw ApiException(res.statusCode, message);
+    throw ApiException(res.statusCode, message, responseBody: errorBody);
   }
 
   /// 리스트 응답이 그대로 오든, DRF 페이지네이션({results: [...]})이나
@@ -357,15 +386,13 @@ class ApiService {
   }
 
   /// 저장된 pet_id가 없으면 GET api/pets/ 목록의 첫 번째 반려견을 사용
-  static Future<int?> _resolvePetId(Map<String, String> headers) async {
+  static Future<int?> _resolvePetId() async {
     final saved = int.tryParse(await storage.read(key: _kPetId) ?? '');
     if (saved != null) return saved;
     try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/pets/'),
-        headers: headers,
+      final pets = _asList(
+        await _authenticatedRequest('GET', '/api/pets/', '반려견 목록'),
       );
-      final pets = _asList(_decodeOrThrow(res, '반려견 목록'));
       if (pets.isEmpty) return null;
       final id = int.tryParse(pets.first['id']?.toString() ?? '');
       if (id != null) await savePetId(id);
@@ -448,57 +475,53 @@ class ApiService {
     }
 
     try {
-      final headers = await _headers();
-      if (!headers.containsKey('Authorization')) {
+      var access = await getAccessToken();
+      if (access == null || access.isEmpty)
+        access = await _refreshSessionToken();
+      if (access == null || access.isEmpty) {
         throw ApiException(401, '로그인 정보가 없습니다. 다시 로그인해주세요.');
       }
-
       final resolvedUserId = userId ?? await getUserId();
       if (resolvedUserId == null) {
         throw ApiException(401, '사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
       }
-      final resolvedPetId = petId ?? await _resolvePetId(headers);
+      final resolvedPetId = petId ?? await _resolvePetId();
       if (resolvedPetId == null) {
         throw ApiException(404, '등록된 반려견을 찾을 수 없습니다.');
       }
 
-      final responses = await Future.wait([
-        http.get(
-          Uri.parse('$baseUrl/api/users/$resolvedUserId/'),
-          headers: headers,
-        ),
-        http.get(
-          Uri.parse('$baseUrl/api/pets/$resolvedPetId/'),
-          headers: headers,
-        ),
-        http.get(
-          Uri.parse('$baseUrl/api/pets/$resolvedPetId/missions/?period=DAILY'),
-          headers: headers,
-        ),
-        http.get(Uri.parse('$baseUrl/api/friends/'), headers: headers),
-      ]);
-
-      // 사용자/반려견 정보는 필수 → 실패하면 에러
-      final userData =
-          _decodeOrThrow(responses[0], '사용자 정보') as Map<String, dynamic>;
-      final petData =
-          _decodeOrThrow(responses[1], '반려견 정보') as Map<String, dynamic>;
-
-      // 미션/친구는 부가 정보 → 401이 아니면 실패해도 빈 목록으로 홈은 띄움
-      List<dynamic> optionalList(http.Response res, String label) {
+      // 부가 정보는 응답을 기다리고, 조회 실패 시 빈 목록을 사용한다.
+      Future<List<dynamic>> optionalList(String path, String label) async {
         try {
-          return _asList(_decodeOrThrow(res, label));
+          final body = await _authenticatedRequest('GET', path, label);
+          return _asList(body);
         } on ApiException catch (e) {
           if (e.isUnauthorized) rethrow;
+          return const [];
+        } catch (_) {
           return const [];
         }
       }
 
-      final missionList = optionalList(
-        responses[2],
-        '미션',
-      ).map((m) => PetMissionItem.fromJson(m as Map<String, dynamic>)).toList();
-      final friendList = optionalList(responses[3], '친구').map((f) {
+      final responses = await Future.wait<dynamic>([
+        _authenticatedRequest('GET', '/api/users/$resolvedUserId/', '사용자 정보'),
+        _authenticatedRequest('GET', '/api/pets/$resolvedPetId/', '반려견 정보'),
+        optionalList('/api/pets/$resolvedPetId/missions/?period=DAILY', '미션'),
+        optionalList('/api/friends/', '친구'),
+      ], eagerError: true);
+
+      final userData = _walkMap(responses[0]);
+      final petData = _walkMap(responses[1]);
+      if (userData.isEmpty || petData.isEmpty) {
+        throw ApiException(502, '사용자 또는 반려견 정보 응답이 비어 있습니다.');
+      }
+      final missionList = (responses[2] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(PetMissionItem.fromJson)
+          .toList();
+      final friendList = (responses[3] as List<dynamic>).whereType<Map>().map((
+        f,
+      ) {
         // GET api/friends/ 응답: { id, nickname, pets: [{ id, name, breed }] }
         final pets = f['pets'];
         final firstPet = (pets is List && pets.isNotEmpty) ? pets.first : null;
@@ -538,8 +561,88 @@ class ApiService {
       );
     } on ApiException {
       rethrow;
-    } catch (e) {
-      throw Exception('홈 데이터 로드 실패: $e');
+    } catch (_) {
+      throw ApiException(503, '홈 데이터를 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.');
+    }
+  }
+
+  static Future<String?>? _refreshInFlight;
+
+  static Future<String?> _refreshSessionToken() async {
+    final running = _refreshInFlight;
+    if (running != null) return running;
+    final request = refreshAccessToken();
+    _refreshInFlight = request;
+    try {
+      return await request;
+    } finally {
+      _refreshInFlight = null;
+    }
+  }
+
+  /// 401에 한해 토큰을 갱신하고 한 번 재요청한다.
+  /// 타임아웃/서버 오류에는 POST를 자동 재실행하지 않는다.
+  static Future<dynamic> _authenticatedRequest(
+    String method,
+    String path,
+    String label, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    var access = token ?? await getAccessToken();
+    if (access == null || access.isEmpty) access = await _refreshSessionToken();
+    if (access == null || access.isEmpty) {
+      throw ApiException(401, '로그인 정보가 없습니다. 다시 로그인해주세요.');
+    }
+    Future<http.Response> send(String bearer) {
+      Future<http.Response> perform() async {
+        final request = http.Request(method, Uri.parse('$baseUrl$path'));
+        request.headers.addAll(await _headers(token: bearer));
+        if (body != null) request.body = jsonEncode(body);
+        return http.Response.fromStream(await request.send());
+      }
+
+      return perform();
+    }
+
+    var response = await send(access);
+    if (response.statusCode == 401) {
+      final saved = await getAccessToken();
+      // 명시적으로 다른 계정 토큰을 전달한 요청에 저장된 세션을 섞지 않는다.
+      if (token == null || token == saved) {
+        final fresh = saved != null && saved != access
+            ? saved
+            : await _refreshSessionToken();
+        if (fresh != null && fresh.isNotEmpty) response = await send(fresh);
+      }
+    }
+    return _decodeOrThrow(response, label);
+  }
+
+  static Map<String, dynamic> _walkMap(dynamic body) {
+    if (body is! Map) return <String, dynamic>{};
+    final data = body['data'];
+    return Map<String, dynamic>.from(data is Map ? data : body);
+  }
+
+  static Map<String, dynamic> _walkResponseMap(dynamic body) =>
+      body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+
+  static Future<Map<String, dynamic>> _withReportPet(
+    Map<String, dynamic> data,
+  ) async {
+    final walk = _walkMap(data['walk'] ?? data);
+    final reference = data['pet'] ?? walk['pet'];
+    if (reference is Map || data['pet_name'] != null) return data;
+    final petId = int.tryParse(reference?.toString() ?? '');
+    if (petId == null || petId <= 0) return data;
+    try {
+      final pet = _walkMap(
+        await _authenticatedRequest('GET', '/api/pets/$petId/', '반려견 정보'),
+      );
+      return {...data, 'pet': pet};
+    } catch (_) {
+      return data;
     }
   }
 
@@ -547,6 +650,7 @@ class ApiService {
   static Future<WalkData> startWalk({
     int? petId,
     bool isLocationShared = true,
+    bool closeBlockingWalk = false,
   }) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -565,24 +669,78 @@ class ApiService {
       );
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/walks/start/'),
-        headers: await _headers(),
-        body: jsonEncode({
-          'pet': petId,
-          'is_location_shared': isLocationShared,
-        }),
+    var resolvedPetId =
+        petId ?? int.tryParse(await storage.read(key: _kPetId) ?? '');
+    if (resolvedPetId == null) {
+      final pets = _asList(
+        await _authenticatedRequest('GET', '/api/pets/', '반려견 목록'),
       );
-
-      final body = jsonDecode(response.body);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return WalkData.fromJson(body['data']);
+      if (pets.isNotEmpty && pets.first is Map) {
+        resolvedPetId = int.tryParse(pets.first['id']?.toString() ?? '');
+        if (resolvedPetId != null) await savePetId(resolvedPetId);
       }
-      throw Exception(body['message'] ?? '산책 시작 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
     }
+    if (resolvedPetId == null || resolvedPetId <= 0) {
+      throw ApiException(404, '등록된 반려견을 찾을 수 없습니다.');
+    }
+    Future<dynamic> requestStart() => _authenticatedRequest(
+      'POST',
+      '/api/walks/start/',
+      '산책 시작',
+      body: {'pet': resolvedPetId, 'is_location_shared': isLocationShared},
+    );
+    dynamic body;
+    try {
+      body = await requestStart();
+    } on ApiException catch (error) {
+      final conflict = _walkMap(error.responseBody);
+      final activeId = int.tryParse(conflict['walk_id']?.toString() ?? '');
+      final activeStatus = conflict['status'];
+      if (!closeBlockingWalk ||
+          (error.statusCode != 400 && error.statusCode != 409) ||
+          activeId == null ||
+          activeId <= 0 ||
+          (activeStatus != 'WALKING' && activeStatus != 'PAUSED'))
+        rethrow;
+
+      // 이전 화면 이탈로 남은 세션만 서버가 알려준 ID로 정리한다.
+      // 새 화면의 0 거리/시간으로 이전 산책 기록을 덮어쓰지 않는다.
+      final details = _walkMap(await getWalkDetails(activeId));
+      final oldWalk = WalkData.fromJson(_walkMap(details['walk'] ?? details));
+      final ownUserId = int.tryParse(await getUserId() ?? '');
+      if (oldWalk.id != activeId ||
+          (oldWalk.userId > 0 && oldWalk.userId != ownUserId)) {
+        throw ApiException(409, '이전 산책의 정보를 확인하지 못했습니다.');
+      }
+      if (oldWalk.status == 'WALKING' || oldWalk.status == 'PAUSED') {
+        try {
+          await endWalk(
+            activeId,
+            currentDistance: oldWalk.totalDistance,
+            currentDurationSeconds: oldWalk.totalDuration,
+            currentDurationStr: oldWalk.totalDurationStr,
+          );
+        } catch (_) {
+          // 응답이 유실돼도 이미 종료됐다면 종료 요청을 반복하지 않는다.
+          final finished = await getFinishedWalkReport(activeId);
+          if (finished == null) rethrow;
+        }
+      } else if (oldWalk.status != 'FINISHED') {
+        throw ApiException(409, '이전 산책 상태를 확인하지 못했습니다.');
+      }
+      // 무한 재시도 없이 한 번만 새 산책을 요청한다.
+      body = await requestStart();
+    }
+    final data = _walkMap(body);
+    final walk = WalkData.fromJson({
+      'status': 'WALKING',
+      'is_location_shared': isLocationShared,
+      ..._walkMap(data['walk'] ?? data),
+    });
+    if (walk.id <= 0) {
+      throw ApiException(502, '시작 응답에 산책 ID가 없습니다. 서버 응답을 확인해주세요.');
+    }
+    return walk;
   }
 
   // [산책 종료 API]
@@ -590,6 +748,7 @@ class ApiService {
     int walkId, {
     double? currentDistance,
     String? currentDurationStr,
+    int? currentDurationSeconds,
   }) async {
     if (useMockData) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -610,20 +769,58 @@ class ApiService {
       );
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/walks/$walkId/end/'),
-        headers: await _headers(),
-      );
-
-      final body = jsonDecode(response.body);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return WalkReportData.fromJson(body['data'] ?? body);
+    if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
+    final minMatch = RegExp(r'(\d+)분').firstMatch(currentDurationStr ?? '');
+    final secMatch = RegExp(r'(\d+)초').firstMatch(currentDurationStr ?? '');
+    final totalSeconds =
+        currentDurationSeconds ??
+        ((int.tryParse(minMatch?.group(1) ?? '') ?? 0) * 60 +
+            (int.tryParse(secMatch?.group(1) ?? '') ?? 0));
+    final body = await _authenticatedRequest(
+      'POST',
+      '/api/walks/$walkId/end/',
+      '산책 종료',
+      body: {
+        'total_distance': currentDistance ?? 0.0,
+        'total_duration': totalSeconds,
+      },
+    );
+    var data = _walkMap(body);
+    // 성공한 종료 요청은 다시 보내지 않는다. 응답에 통계가 없으면 상세 조회.
+    if (!data.containsKey('walk') && !data.containsKey('total_distance')) {
+      try {
+        final details = await getWalkDetails(walkId);
+        data = {...details, ...data};
+      } catch (_) {
+        // 종료 자체는 성공했다. 화면에서 측정한 거리/시간으로 리포트를 표시한다.
       }
-      throw Exception(body['message'] ?? '산책 종료 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
     }
+    return WalkReportData.fromJson(
+      await _withReportPet(data),
+      fallbackDistance: currentDistance,
+      fallbackDuration:
+          currentDurationStr ?? '${totalSeconds ~/ 60}분 ${totalSeconds % 60}초',
+    );
+  }
+
+  /// 종료 응답이 유실된 경우 GET으로 종료 여부를 확인한 뒤 리포트를 복구한다.
+  static Future<WalkReportData?> getFinishedWalkReport(
+    int walkId, {
+    double? fallbackDistance,
+    String? fallbackDuration,
+  }) async {
+    final data = await getWalkDetails(walkId);
+    final walk = _walkMap(data['walk'] ?? data);
+    final status = walk['status'];
+    if (status == 'WALKING' || status == 'PAUSED') return null;
+    if (status != 'FINISHED') {
+      throw ApiException(502, '산책 종료 상태를 확인하지 못했습니다. 서버 응답을 확인해주세요.');
+    }
+    return WalkReportData.fromJson(
+      await _withReportPet(data),
+      fallbackDistance: fallbackDistance,
+      fallbackDuration: fallbackDuration,
+    );
   }
 
   // [산책 중 위치 공유 토글 API (PATCH api/walks/:walk_id/location-share/)]
@@ -644,19 +841,16 @@ class ApiService {
       };
     }
 
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/api/walks/$walkId/location-share/'),
-        headers: await _headers(token: token),
-        body: jsonEncode({'is_location_shared': isLocationShared}),
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return jsonDecode(res.body);
-      }
-      throw Exception('위치 공유 토글 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
-    }
+    if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
+    return _walkResponseMap(
+      await _authenticatedRequest(
+        'PATCH',
+        '/api/walks/$walkId/location-share/',
+        '위치 공유 변경',
+        token: token,
+        body: {'is_location_shared': isLocationShared},
+      ),
+    );
   }
 
   // [산책 중 상태 변경 API (PATCH api/walks/:walk_id/)] - "WALKING", "PAUSED", "FINISHED"
@@ -673,19 +867,19 @@ class ApiService {
       };
     }
 
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/api/walks/$walkId/'),
-        headers: await _headers(token: token),
-        body: jsonEncode({'status': status}),
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return jsonDecode(res.body);
-      }
-      throw Exception('산책 상태 변경 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
+    if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
+    if (!['WALKING', 'PAUSED', 'FINISHED'].contains(status)) {
+      throw ArgumentError.value(status, 'status');
     }
+    return _walkMap(
+      await _authenticatedRequest(
+        'PATCH',
+        '/api/walks/$walkId/',
+        '산책 상태 변경',
+        token: token,
+        body: {'status': status},
+      ),
+    );
   }
 
   // [산책 경로 위치 저장 API (POST api/walks/:walk_id/locations/)]
@@ -702,19 +896,16 @@ class ApiService {
       };
     }
 
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/api/walks/$walkId/locations/'),
-        headers: await _headers(token: token),
-        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return jsonDecode(res.body);
-      }
-      throw Exception('위치 저장 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
-    }
+    if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
+    return _walkMap(
+      await _authenticatedRequest(
+        'POST',
+        '/api/walks/$walkId/locations/',
+        '산책 위치 저장',
+        token: token,
+        body: {'latitude': latitude, 'longitude': longitude},
+      ),
+    );
   }
 
   // [산책 상세 조회 API (GET api/walks/:walk_id/)]
@@ -737,18 +928,15 @@ class ApiService {
       };
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/walks/$walkId/'),
-        headers: await _headers(token: token),
-      );
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body);
-      }
-      throw Exception('산책 상세 정보 조회 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
-    }
+    if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
+    return _walkMap(
+      await _authenticatedRequest(
+        'GET',
+        '/api/walks/$walkId/',
+        '산책 상세 조회',
+        token: token,
+      ),
+    );
   }
 
   // [일반 로그인 API]
@@ -957,18 +1145,6 @@ class ApiService {
     if (useMockData) return {'success': true};
 
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/api/pets/'),
-      );
-
-      request.headers['Authorization'] = 'Bearer $accessToken';
-
-      request.fields['nickname'] = nickname;
-      request.fields['name'] = name;
-      request.fields['breed'] = breed;
-      request.fields['birth_date'] = birthDate;
-
       const personalityMap = {
         '에너지형': 'energy',
         '사회성형': 'social',
@@ -978,40 +1154,40 @@ class ApiService {
         '얌전형': 'calm',
       };
 
-      if (personalities != null) {
-        for (int i = 0; i < personalities.length; i++) {
-          final personalityValue =
-              personalityMap[personalities[i]] ?? personalities[i];
-
-          request.fields['personalities[$i]'] = personalityValue;
-        }
-      }
-
-      if (profileImagePath != null && profileImagePath.isNotEmpty) {
-        request.files.add(
-          await http.MultipartFile.fromPath('profile_image', profileImagePath),
-        );
-      }
-
-      final response = await http.Response.fromStream(await request.send());
-      final bool success =
-          response.statusCode == 200 || response.statusCode == 201;
-
-      // 등록된 반려견 id를 저장해두면 홈 화면에서 pet_id를 하드코딩할 필요가 없음
-      if (success) {
-        try {
-          final body = jsonDecode(utf8.decode(response.bodyBytes));
-          final rawId = body is Map
-              ? (body['id'] ?? body['data']?['id'])
-              : null;
-          final petId = int.tryParse(rawId?.toString() ?? '');
-          if (petId != null) await savePetId(petId);
-        } catch (_) {}
-      }
-
-      return {'success': success};
-    } catch (e) {
-      return {'success': false};
+      // 첨부 명세: POST /api/pets/ 는 application/json이며
+      // personalities는 문자열 배열, profile_image는 문자열 필드이다.
+      // 기존 호출부 호환을 위해 이름은 유지한다. 로컬 파일 업로드 경로가
+      // 아니라 API에서 받는 이미지 문자열(URL/미디어 경로)을 전달한다.
+      final image = profileImagePath?.trim();
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/pets/'),
+        headers: await _headers(token: accessToken),
+        body: jsonEncode({
+          'nickname': nickname,
+          'name': name,
+          'breed': breed,
+          'birth_date': birthDate,
+          if (image != null && image.isNotEmpty) 'profile_image': image,
+          'personalities': (personalities ?? const <String>[])
+              .map((value) => personalityMap[value] ?? value)
+              .toList(),
+        }),
+      );
+      final body = _decodeOrThrow(response, '반려견 등록');
+      final data = body is Map ? (body['data'] ?? body) : null;
+      final petId = data is Map
+          ? int.tryParse(data['id']?.toString() ?? '')
+          : null;
+      if (petId != null) await savePetId(petId);
+      return {'success': true, 'data': data};
+    } on ApiException catch (e) {
+      return {
+        'success': false,
+        'message': e.message,
+        'statusCode': e.statusCode,
+      };
+    } catch (_) {
+      return {'success': false, 'message': '반려견 등록 중 서버와 연결하지 못했습니다.'};
     }
   }
 
@@ -1046,6 +1222,30 @@ class ApiService {
   // -----------------------------------------------------------------------------
   // [출석 체크 관련 API 엔드포인트]
   // -----------------------------------------------------------------------------
+
+  // 응답 목록이 객체로 감싸져 있어도 처리하되, 알 수 없는 구조를
+  // 빈 목록으로 바꾸어 조회 성공으로 표시하지 않는다.
+  static List<dynamic> _attendanceRows(dynamic body, String label) {
+    if (body is List) return body;
+    if (body is Map) {
+      for (final key in ['results', 'rewards', 'data']) {
+        final inner = body[key];
+        if (inner is List) return inner;
+        if (inner is Map) return _attendanceRows(inner, label);
+      }
+      throw FormatException(
+        '$label 응답의 목록 필드를 확인해주세요. '
+        '수신 필드: ${body.keys.join(', ')}',
+      );
+    }
+    throw FormatException('$label 응답이 목록 형식이 아닙니다.');
+  }
+
+  static Map<String, dynamic> _attendanceObject(dynamic body, String label) {
+    if (body is! Map) throw FormatException('$label 응답이 객체 형식이 아닙니다.');
+    final inner = body['data'];
+    return Map<String, dynamic>.from(inner is Map ? inner : body);
+  }
 
   // 1. GET api/attendance/summary/ (출석 요약 및 보상 수령 여부)
   static Future<AttendanceSummaryResponse> getAttendanceSummary({
@@ -1115,18 +1315,17 @@ class ApiService {
       );
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/attendance/summary/'),
-        headers: await _headers(token: token),
-      );
-      if (res.statusCode == 200) {
-        return AttendanceSummaryResponse.fromJson(jsonDecode(res.body));
-      }
-      throw Exception('출석 요약 조회 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
+    final body = await _authenticatedRequest(
+      'GET',
+      '/api/attendance/summary/',
+      '출석 요약 조회',
+      token: token,
+    );
+    final json = _attendanceObject(body, '출석 요약');
+    if (json['today'] is! Map) {
+      throw FormatException('출석 요약 응답의 today 필드를 확인해주세요.');
     }
+    return AttendanceSummaryResponse.fromJson(json);
   }
 
   // 2. GET api/attendance/calendar/?year=year&month=month (월간 출석 달력)
@@ -1178,18 +1377,15 @@ class ApiService {
       return AttendanceCalendarResponse(year: year, month: month, days: days);
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/attendance/calendar/?year=$year&month=$month'),
-        headers: await _headers(token: token),
-      );
-      if (res.statusCode == 200) {
-        return AttendanceCalendarResponse.fromJson(jsonDecode(res.body));
-      }
-      throw Exception('출석 달력 조회 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
-    }
+    final body = await _authenticatedRequest(
+      'GET',
+      '/api/attendance/calendar/?year=$year&month=$month',
+      '출석 달력 조회',
+      token: token,
+    );
+    return AttendanceCalendarResponse.fromJson(
+      _attendanceObject(body, '출석 달력'),
+    );
   }
 
   // 3. GET api/attendance/rewards/ (보상 목록)
@@ -1238,19 +1434,18 @@ class ApiService {
       ];
     }
 
-    try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/attendance/rewards/'),
-        headers: await _headers(token: token),
-      );
-      if (res.statusCode == 200) {
-        final List list = jsonDecode(res.body);
-        return list.map((item) => AttendanceRewardItem.fromJson(item)).toList();
+    final body = await _authenticatedRequest(
+      'GET',
+      '/api/attendance/rewards/',
+      '출석 보상 목록 조회',
+      token: token,
+    );
+    return _attendanceRows(body, '출석 보상 목록').map((item) {
+      if (item is! Map) {
+        throw FormatException('출석 보상 목록의 항목이 객체 형식이 아닙니다.');
       }
-      throw Exception('보상 목록 조회 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
-    }
+      return AttendanceRewardItem.fromJson(Map<String, dynamic>.from(item));
+    }).toList();
   }
 
   // 4. PATCH api/attendance/rewards/:reward_id/open/ (출석 보상 수령)
@@ -1274,18 +1469,22 @@ class ApiService {
       );
     }
 
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/api/attendance/rewards/$rewardId/open/'),
-        headers: await _headers(token: token),
+    if (rewardId <= 0) throw ArgumentError.value(rewardId, 'rewardId');
+    final body = await _authenticatedRequest(
+      'PATCH',
+      '/api/attendance/rewards/$rewardId/open/',
+      '출석 보상 열기',
+      token: token,
+    );
+    final json = _attendanceObject(body, '출석 보상 열기');
+    final reward = AttendanceRewardItem.fromJson(json);
+    if (reward.id != rewardId) {
+      throw FormatException(
+        '보상 열기 응답의 id 필드를 확인해주세요. '
+        '서버에서 열렸을 수 있으니 출석 화면을 다시 조회해주세요.',
       );
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return AttendanceRewardItem.fromJson(jsonDecode(res.body));
-      }
-      throw Exception('보상 수령 실패');
-    } catch (e) {
-      throw Exception('서버 연결 실패: $e');
     }
+    return reward;
   }
 
   // [POST api/friends/qr/ - 나의 QR 생성 API]
@@ -1354,7 +1553,11 @@ class ApiService {
       if (res.statusCode == 200) {
         final data = jsonDecode(utf8.decode(res.bodyBytes));
         final newAccess = data['access']?.toString();
-        if (newAccess != null) {
+        if (newAccess != null && newAccess.isNotEmpty) {
+          final rotatedRefresh = data['refresh']?.toString();
+          if (rotatedRefresh != null && rotatedRefresh.isNotEmpty) {
+            await storage.write(key: _kRefreshToken, value: rotatedRefresh);
+          }
           await storage.write(key: _kAccessToken, value: newAccess);
           return newAccess;
         }
@@ -1517,9 +1720,10 @@ class AttendanceSummaryResponse {
   });
 
   factory AttendanceSummaryResponse.fromJson(Map<String, dynamic> json) {
-    final weekList = (json['week'] as List<dynamic>? ?? [])
-        .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final weekList =
+        ApiService._attendanceRows(json['week'] ?? [], '출석 요약 week')
+            .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
+            .toList();
     return AttendanceSummaryResponse(
       currentStreak: json['current_streak'] ?? 0,
       bestStreak: json['best_streak'] ?? 0,
@@ -1543,9 +1747,10 @@ class AttendanceCalendarResponse {
   });
 
   factory AttendanceCalendarResponse.fromJson(Map<String, dynamic> json) {
-    final daysList = (json['days'] as List<dynamic>? ?? [])
-        .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final daysList =
+        ApiService._attendanceRows(json['days'] ?? [], '출석 달력 days')
+            .map((e) => AttendanceDayItem.fromJson(e as Map<String, dynamic>))
+            .toList();
     return AttendanceCalendarResponse(
       year: json['year'] ?? 2026,
       month: json['month'] ?? 10,
