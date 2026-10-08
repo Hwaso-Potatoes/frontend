@@ -1,16 +1,11 @@
 // lib/screens/account_settings_screen.dart
 
-// ── 백엔드 연결 시 확인/요청해야 할 것 ──
-// 1. SNS 계정 연동/해제(Google/Apple/Kakao) 엔드포인트 확인 필요 (아직 안 받음)
-// 2. 이메일/휴대폰 번호는 GET api/users/:user_id/ 응답에 없어서(닉네임만 옴)
-//    실제로 어디서 이 값들을 가져오는지 확인 필요. 지금은 더미로 표시함.
-// 3. 화살표(이메일 -> 이메일 변경 화면, 비밀번호 재설정 -> 비밀번호 재설정 화면)
-//    네비게이션은 지금 임시 placeholder로 연결해뒀음. change_email_screen,
-//    reset_password_screen 파일 완성되면 실제 화면으로 교체할 것.
+// Email comes from the shared account snapshot. Phone/SNS behavior remains
+// unchanged until those backend contracts are available.
 
 import 'package:flutter/material.dart';
 import '../widgets/slide_up_sheet_route.dart';
-import 'change_email_screen.dart';
+import '../services/active_pet_store.dart';
 import 'reset_password_screen.dart';
 
 const Color _kBgColor = Color(0xFFF8F9E5);
@@ -27,17 +22,26 @@ class AccountSettingsScreen extends StatefulWidget {
 }
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
-  // TODO(backend): 실제로는 GET api/users/:user_id/ 등에서 받아와야 함
-  final String _email = 'Tori@mail.com';
+  String get _email =>
+      ActivePetStore.instance.user['email']?.toString() ?? '조회 필요';
   final String _phoneNumber = '010-50**-68**';
 
   bool _googleLinked = true;
   bool _appleLinked = false;
   bool _kakaoLinked = false;
 
+  @override
+  void initState() {
+    super.initState();
+    ActivePetStore.instance.ensureLoaded();
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: ActivePetStore.instance,
+    builder: (context, _) => _buildSettings(context),
+  );
+  Widget _buildSettings(BuildContext context) {
     return Scaffold(
       backgroundColor: _kBgColor,
       body: SafeArea(
@@ -77,6 +81,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
                 const SizedBox(height: 25),
 
+                if (ActivePetStore.instance.error != null)
+                  TextButton(
+                    onPressed: ActivePetStore.instance.refresh,
+                    child: const Text('계정 정보 다시 조회'),
+                  ),
                 // ── 계정 ──
                 _buildSectionLabel('계정'),
                 const SizedBox(height: 8),
@@ -85,11 +94,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     _AccountRow(
                       title: '이메일',
                       trailingText: _email,
-                      showChevron: true,
-                      onTap: () => pushSlideUpSheet(
-                        context,
-                        (context) => const ChangeEmailScreen(),
-                      ),
+                      showChevron: false,
                     ),
                     _AccountRow(
                       title: '비밀번호 재설정',
@@ -211,15 +216,19 @@ class _AccountRow extends StatelessWidget {
             ),
             const Spacer(),
             if (trailingText != null)
-              Text(
-                trailingText!,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  height: 1.0,
-                  color: Colors.black.withOpacity(0.4),
+              Flexible(
+                child: Text(
+                  trailingText!,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.0,
+                    color: Colors.black.withOpacity(0.4),
+                  ),
                 ),
               ),
             if (showChevron) ...[

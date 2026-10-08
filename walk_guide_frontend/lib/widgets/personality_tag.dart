@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// 성격 태그 1개 (에너지형 / 호기심형 등)
 /// TODO(backend): personalities의 정확한 API 키 값(예: "energy" 외 나머지 5개)
@@ -12,10 +13,60 @@ import 'package:flutter/material.dart';
 class PersonalityTag extends StatelessWidget {
   final String label;
   final Color? backgroundColor;
-  const PersonalityTag({super.key, required this.label, this.backgroundColor});
+  final bool homeStyle;
+  const PersonalityTag({
+    super.key,
+    required this.label,
+    this.backgroundColor,
+    this.homeStyle = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (homeStyle) {
+      const colors = {
+        '에너지형': Color(0xFFFCF9CA),
+        '사회성형': Color(0xFFC9E7E4),
+        '겁쟁이형': Color(0xFFF5DBE4),
+        '호기심형': Color(0xFFE7E4B7),
+        '느긋형': Color(0xFFCBE9CF),
+        '얌전형': Color(0xFFE5E2DD),
+      };
+      const icons = {
+        '에너지형': Icons.bolt_outlined,
+        '사회성형': Icons.people_outline,
+        '겁쟁이형': Icons.shield_outlined,
+        '호기심형': Icons.search,
+        '느긋형': Icons.nightlight_round,
+        '얌전형': Icons.local_florist_outlined,
+      };
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colors[label] ?? const Color(0xFFF7F3D8),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFA9AD8A), width: 1.3),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icons[label] ?? Icons.pets_outlined, size: 18),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     late final Color bgColor;
     late final IconData icon;
     late final double iconSize;

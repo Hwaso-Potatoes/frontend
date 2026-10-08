@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'SignUpInfo3.dart';
@@ -28,7 +27,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
   final TextEditingController _petNameController = TextEditingController();
 
   String? _selectedBreed;
-  DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedDate;
 
   final List<String> _dogBreeds = [
     '슈나우저',
@@ -60,8 +59,8 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2000),
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
@@ -101,9 +100,13 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
       return;
     }
 
-    final String year = _selectedDate.year.toString();
-    final String month = _selectedDate.month.toString().padLeft(2, '0');
-    final String day = _selectedDate.day.toString().padLeft(2, '0');
+    if (_selectedDate == null) {
+      showCustomDialog(context: context, title: '안내', message: '생년월일을 선택해주세요.');
+      return;
+    }
+    final String year = _selectedDate!.year.toString();
+    final String month = _selectedDate!.month.toString().padLeft(2, '0');
+    final String day = _selectedDate!.day.toString().padLeft(2, '0');
     final birthDate = '$year-$month-$day';
 
     Navigator.push(
@@ -131,8 +134,9 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
 
   @override
   Widget build(BuildContext context) {
-    final String formattedDateDisplay =
-        "${_selectedDate.year} . ${_selectedDate.month.toString().padLeft(2, '0')} . ${_selectedDate.day.toString().padLeft(2, '0')}";
+    final String formattedDateDisplay = _selectedDate == null
+        ? '생년월일을 선택해 주세요'
+        : "${_selectedDate!.year} . ${_selectedDate!.month.toString().padLeft(2, '0')} . ${_selectedDate!.day.toString().padLeft(2, '0')}";
 
     return Scaffold(
       backgroundColor: backgroundColor,

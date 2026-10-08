@@ -259,6 +259,12 @@ class ApiException implements Exception {
 // [4. ApiService 메인 클래스]
 // -----------------------------------------------------------------------------
 class ApiService {
+  static Future<dynamic> requestData(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) => _authenticatedRequest(method, path, '정보 요청', body: body);
+
   static const String baseUrl = kApiBaseUrl;
   static const bool useMockData = kUseMockData;
 
@@ -602,7 +608,7 @@ class ApiService {
         return http.Response.fromStream(await request.send());
       }
 
-      return perform();
+      return perform().timeout(const Duration(seconds: 25));
     }
 
     var response = await send(access);

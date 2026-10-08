@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 const Map<String, String> _koreanBreedToKey = {
   '슈나우저': 'schnauzer',
   '그레이하운드': 'greyhound',
+  '이탈리안그레이하운드': 'greyhound',
   '시바견': 'shiba',
   '시바': 'shiba',
   '비글': 'beagle',
@@ -25,10 +26,11 @@ const Map<String, String> _koreanBreedToKey = {
   '허스키': 'husky',
   '도베르만': 'doberman',
   '시츄': 'shih_tzu',
+  '시추': 'shih_tzu',
 };
 
 String dogBreedKey(String breed) =>
-    _koreanBreedToKey[breed.trim()] ?? breed.trim().toLowerCase();
+    _koreanBreedToKey[breed.replaceAll(RegExp(r'\s+'), '')] ?? breed.trim().toLowerCase();
 
 /// 백엔드의 breed 값(key) → 로컬 에셋 경로(value) 매핑
 /// 전부 png (svg가 사실 래스터 이미지를 감싼 것들이라 png로 교체함)
