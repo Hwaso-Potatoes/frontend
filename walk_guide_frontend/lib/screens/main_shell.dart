@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_widgets.dart';
 import 'home.dart';
+import '../services/active_pet_store.dart';
 import 'report_screen.dart';
 import 'walk_tracking.dart';
 import 'profile_screen.dart';
@@ -37,6 +38,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    ActivePetStore.instance.reset();
+    ActivePetStore.instance.refresh();
   }
 
   // 바텀바의 탭 index(0,1,3,4)를 _navigatorKeys 배열 index(0,1,2,3)로 바꿔주는 함수

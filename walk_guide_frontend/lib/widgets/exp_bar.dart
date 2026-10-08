@@ -8,7 +8,7 @@ class ExpBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double progress = currentExp / requiredExp;
+    final double progress = requiredExp > 0 ? (currentExp / requiredExp).clamp(0.0, 1.0) : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

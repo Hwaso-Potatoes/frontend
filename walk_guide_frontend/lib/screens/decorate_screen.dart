@@ -1,9 +1,8 @@
 // lib/screens/decorate_screen.dart
 
 import 'package:flutter/material.dart';
-import '../models/dog_model.dart';
+import '../services/active_pet_store.dart';
 import '../models/decoration_model.dart';
-import '../models/accessory_render_catalog.dart';
 import '../widgets/decoration/category_tabs.dart';
 import '../widgets/decoration/accessory_grid.dart';
 import '../widgets/decoration/dog_stage.dart';
@@ -12,11 +11,13 @@ const Color backgroundColor = Color(0xFFF8F9E5);
 
 /// 악세사리 꾸미기 화면
 class DecorationScreen extends StatefulWidget {
+  final ActivePetStore? store;
   final String? initialAccessoryName;
   final AccessoryItem? initialAccessoryItem;
 
   const DecorationScreen({
     super.key,
+    this.store,
     this.initialAccessoryName,
     this.initialAccessoryItem,
   });
@@ -27,61 +28,55 @@ class DecorationScreen extends StatefulWidget {
 
 class _DecorationScreenState extends State<DecorationScreen> {
   AccessoryCategory _selectedCategory = AccessoryCategory.hair;
-  late List<AccessoryItem> _items;
-
+  ActivePetStore get _store => widget.store ?? ActivePetStore.instance;
+  List<AccessoryItem> get _items => _store.accessories;
   @override
   void initState() {
     super.initState();
-    _items = List.of(previewAccessories);
-
-    AccessoryItem? initial = widget.initialAccessoryItem;
-    // Legacy reward callers supply a display name only. Resolve an existing
-    // record; never fabricate an ID, empty image, category or render subtype.
-    if (initial == null && widget.initialAccessoryName != null) {
-      for (final item in [...previewAccessories, ...dummyAccessories]) {
-        if (item.name == widget.initialAccessoryName) {
-          initial = item;
-          break;
-        }
-      }
-    }
-    if (initial != null) {
-      final target = initial;
-      _selectedCategory = target.category;
-      final alreadyListed = _items.any(
-        (item) => item.accessoryId == target.accessoryId,
-      );
-      _items = _items
-          .map(
-            (item) => item.accessoryId == target.accessoryId
-                ? target.copyWith(isEquipped: true)
-                : item.category == target.category
-                ? item.copyWith(isEquipped: false)
-                : item,
-          )
-          .toList();
-      if (!alreadyListed) _items.add(target.copyWith(isEquipped: true));
-    }
+    _selectedCategory =
+        widget.initialAccessoryItem?.category ?? AccessoryCategory.hair;
+    _store.ensureLoaded();
   }
 
   List<AccessoryItem> get _filteredItems =>
       _items.where((item) => item.category == _selectedCategory).toList();
 
-  void _handleTap(AccessoryItem tapped) {
-    setState(() {
-      _items = _items.map((item) {
-        if (item.category != tapped.category) return item;
-        if (item.accessoryId == tapped.accessoryId) {
-          return item.copyWith(isEquipped: !item.isEquipped);
-        }
-        return item.copyWith(isEquipped: false);
-      }).toList();
-    });
+  Future<void> _handleTap(AccessoryItem tapped) async {
+    try {
+      await _store.setAccessory(tapped);
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final dog = dummyDog;
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _store,
+    builder: (context, _) => _buildDecoration(context),
+  );
+  Widget _buildDecoration(BuildContext context) {
+    final state = _store;
+    final dog = state.pet;
+    if (dog == null)
+      return Scaffold(
+        body: Center(
+          child: state.loading
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(state.error ?? '반려견 정보가 없습니다.'),
+                    TextButton(
+                      onPressed: state.refresh,
+                      child: const Text('다시 조회'),
+                    ),
+                  ],
+                ),
+        ),
+      );
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -190,9 +185,26 @@ class _DecorationScreenState extends State<DecorationScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 25),
-                                AccessoryGrid(
-                                  items: _filteredItems,
-                                  onTap: _handleTap,
+                                if (state.accessoriesError != null)
+                                  TextButton(
+                                    onPressed: state.reloadAccessories,
+                                    child: Text(state.accessoriesError!),
+                                  ),
+                                if (state.equipping || state.loading)
+                                  const LinearProgressIndicator(),
+                                if (!state.loading &&
+                                    state.accessoriesError == null &&
+                                    _filteredItems.isEmpty)
+                                  const Text('표시할 액세서리가 없습니다.'),
+                                IgnorePointer(
+                                  ignoring:
+                                      state.equipping ||
+                                      state.loading ||
+                                      state.accessoriesError != null,
+                                  child: AccessoryGrid(
+                                    items: _filteredItems,
+                                    onTap: _handleTap,
+                                  ),
                                 ),
                               ],
                             ),

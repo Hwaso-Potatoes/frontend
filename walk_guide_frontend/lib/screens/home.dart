@@ -6,6 +6,10 @@ import '../services/api_service.dart';
 import 'decorate_screen.dart';
 import 'attendance_screen.dart';
 import 'login.dart';
+import '../services/active_pet_store.dart';
+import '../widgets/pet_identity.dart';
+import '../widgets/personality_tag.dart';
+import '../widgets/decoration/dog_character.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF27722F);
@@ -41,7 +45,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadDashboard() {
     setState(() {
-      _homeDataFuture = ApiService.getHomeDashboardData();
+      _homeDataFuture = () async {
+        if (ActivePetStore.instance.error != null) {
+          await ActivePetStore.instance.refresh();
+        } else {
+          await ActivePetStore.instance.ensureLoaded();
+        }
+        if (ActivePetStore.instance.error != null)
+          throw ApiException(
+            ActivePetStore.instance.errorStatus ?? 500,
+            ActivePetStore.instance.error!,
+          );
+        return ApiService.getHomeDashboardData();
+      }();
     });
     _loadAttendanceStatus();
   }
@@ -103,7 +119,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: ActivePetStore.instance,
+    builder: (context, _) => _buildHome(context),
+  );
+  Widget _buildHome(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: FutureBuilder<HomeDashboardResponse>(
@@ -149,7 +169,24 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          final data = snapshot.data!;
+          final original = snapshot.data!;
+          final state = ActivePetStore.instance;
+          final pet = state.pet;
+          final data = HomeDashboardResponse(
+            userName: state.user['nickname']?.toString() ?? original.userName,
+            petId: pet?.id ?? original.petId,
+            petName: pet?.name ?? original.petName,
+            petBreed: pet?.breed ?? original.petBreed,
+            petAge: pet?.age ?? original.petAge,
+            petLevel: pet?.level ?? original.petLevel,
+            petImageUrl: null,
+            petPersonalities: pet?.traits ?? original.petPersonalities,
+            targetDistance: original.targetDistance,
+            currentDistance: original.currentDistance,
+            walkingFriends: original.walkingFriends,
+            dailyMissions: original.dailyMissions,
+          );
+
           final double walkRatio = data.targetDistance > 0
               ? (data.currentDistance / data.targetDistance).clamp(0.0, 1.0)
               : 0.0;
@@ -284,7 +321,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     Positioned(
                       bottom: 0,
-                      child: _buildDogImage(petImageUrl, breed, size: dogSize),
+                      child: DogCharacter(
+                        breed: breed,
+                        size: dogSize,
+                        equipped: ActivePetStore.instance.equipped,
+                      ),
                     ),
                   ],
                 );
@@ -480,113 +521,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPetProfileHeader(HomeDashboardResponse data) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final pet = ActivePetStore.instance.pet;
+    if (pet == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data.petName,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: PetIdentity(pet: pet)),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Lv.${pet.level}',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: pet.traits.map(_buildPersonalityTag).toList(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                '${data.petBreed} . ${data.petAge}세',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black45,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 2,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Lv.${data.petLevel}',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // 태그가 커져도 좁은 화면에서 넘치지 않도록 줄바꿈한다.
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 6,
-                runSpacing: 6,
-                children: data.petPersonalities
-                    .map(_buildPersonalityTag)
-                    .toList(),
-              ),
-            ],
+        if (ActivePetStore.instance.accessoriesError != null)
+          TextButton(
+            onPressed: ActivePetStore.instance.reloadAccessories,
+            child: const Text('장착 정보 다시 조회'),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildPersonalityTag(String trait) {
-    // 회원가입 화면의 성격별 의미에 맞는 아이콘을 사용한다.
-    const icons = <String, IconData>{
-      '에너지형': Icons.bolt_outlined,
-      '사회성형': Icons.people_outline,
-      '겁쟁이형': Icons.shield_outlined,
-      '호기심형': Icons.search,
-      '느긋형': Icons.nightlight_round,
-      '얌전형': Icons.local_florist_outlined,
-    };
-    const colors = <String, Color>{
-      '에너지형': Color(0xFFFCF9CA),
-      '사회성형': Color(0xFFC9E7E4),
-      '겁쟁이형': Color(0xFFF5DBE4),
-      '호기심형': Color(0xFFE7E4B7),
-      '느긋형': Color(0xFFCBE9CF),
-      '얌전형': Color(0xFFE5E2DD),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors[trait] ?? const Color(0xFFF7F3D8),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFA9AD8A), width: 1.3),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icons[trait] ?? Icons.pets_outlined,
-            size: 18,
-            color: Colors.black,
-          ),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              trait,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-                height: 1.2,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildPersonalityTag(String trait) =>
+      PersonalityTag(label: trait, homeStyle: true);
 
   Widget _buildWalkProgressCard(
     HomeDashboardResponse data,

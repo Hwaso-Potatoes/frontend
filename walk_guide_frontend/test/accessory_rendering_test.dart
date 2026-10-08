@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:walk_guide_frontend/services/active_pet_store.dart';
+import 'package:walk_guide_frontend/models/active_pet_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:walk_guide_frontend/models/accessory_render_catalog.dart';
 import 'package:walk_guide_frontend/models/decoration_model.dart';
@@ -152,7 +154,58 @@ void main() {
     'category toggle keeps other categories and unequips on second tap',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(402, 874));
-      await tester.pumpWidget(const MaterialApp(home: DecorationScreen()));
+      final owned = previewAccessories
+          .map(
+            (item) => {
+              'id': item.accessoryId,
+              'accessory': {'id': item.accessoryId},
+              'is_equipped': false,
+            },
+          )
+          .toList();
+      final catalog = previewAccessories
+          .map(
+            (item) => {
+              'id': item.accessoryId,
+              'name': item.name,
+              'category': item.category.apiValue,
+            },
+          )
+          .toList();
+      final store = ActivePetStore(
+        request: (method, path, {body}) async {
+          if (method == 'POST') {
+            final id = int.parse(path.split('/')[5]);
+            final item = previewAccessories.firstWhere(
+              (item) => item.accessoryId == id,
+            );
+            for (final row in owned) {
+              final rowId = row['id'] as int;
+              if (previewAccessories
+                      .firstWhere((item) => item.accessoryId == rowId)
+                      .category ==
+                  item.category)
+                row['is_equipped'] = false;
+            }
+            owned.firstWhere((row) => row['id'] == id)['is_equipped'] = path
+                .endsWith('/equip/');
+            return {};
+          }
+          return path == '/api/accessories/' ? catalog : owned;
+        },
+      );
+      store.pet = const ActivePet(
+        id: 1,
+        name: '두부',
+        breed: '비숑',
+        birthDate: null,
+        personalities: [],
+        level: 1,
+      );
+      store.accessories = mergeAccessories(catalog, owned);
+      await tester.pumpWidget(
+        MaterialApp(home: DecorationScreen(store: store)),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('accessory-choice-1')));
       await tester.pumpAndSettle();
