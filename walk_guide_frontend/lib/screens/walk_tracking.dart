@@ -137,16 +137,21 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     }
   }
 
-  // 명세: ws/walks/:walk_id/. 기본값은 별도 쿼리 없이 연결한다.
-  // 인증 쿼리 이름은 백엔드 확인 후 --dart-define으로 지정할 수 있다.
+  // 백엔드 인증 명세: ws/walks/:walk_id/?token=ACCESS_TOKEN.
+  // 별도 실행 옵션 없이도 저장된 JWT를 token 쿼리로 전달한다.
   Future<Uri> _friendsSocketUri(int walkId) async {
     final api = Uri.parse(ApiService.baseUrl);
     final uri = api
         .resolve('/ws/walks/$walkId/')
         .replace(scheme: api.scheme == 'https' ? 'wss' : 'ws');
-    const tokenQuery = String.fromEnvironment('WALK_WS_TOKEN_QUERY');
-    if (tokenQuery.isEmpty) return uri;
-    final token = await ApiService.getAccessToken();
+    const configuredQuery = String.fromEnvironment(
+      'WALK_WS_TOKEN_QUERY',
+      defaultValue: 'token',
+    );
+    final tokenQuery = configuredQuery.trim().isEmpty
+        ? 'token'
+        : configuredQuery.trim();
+    final token = (await ApiService.getAccessToken())?.trim();
     if (token == null || token.isEmpty) {
       throw ApiException(401, '로그인이 만료되었습니다. 다시 로그인해주세요.');
     }
