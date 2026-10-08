@@ -20,6 +20,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   AttendanceSummaryResponse? _summary;
   List<AttendanceRewardItem> _rewards = [];
   bool _isGiftOpened = false;
+  bool _isOpeningGift = false;
+  String? _loadError;
+  String? _rewardsError;
+  bool _isLoadingRewards = false;
+
+  bool get _hasReward => (_summary?.today.reward?.id ?? 0) > 0;
 
   @override
   void initState() {
@@ -28,26 +34,62 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _loadAttendanceData() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final summaryRes = await ApiService.getAttendanceSummary();
-      final rewardsRes = await ApiService.getAttendanceRewards();
-
       if (!mounted) return;
       setState(() {
         _summary = summaryRes;
-        _rewards = rewardsRes;
         _isGiftOpened = summaryRes.today.reward?.opened ?? false;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      debugPrint('출석 데이터 조회 실패: $e');
+      setState(() {
+        _isLoading = false;
+        _loadError = '출석 요약을 불러오지 못했습니다.\n$e';
+      });
+      return;
+    }
+    await _loadRewards();
+  }
+
+  Future<void> _loadRewards() async {
+    if (_isLoadingRewards || !mounted) return;
+    setState(() {
+      _isLoadingRewards = true;
+      _rewardsError = null;
+    });
+    try {
+      final rewards = await ApiService.getAttendanceRewards();
+      if (!mounted) return;
+      setState(
+        () => _rewards = rewards.where((reward) => reward.opened).toList(),
+      );
+    } catch (e) {
+      debugPrint('출석 보상 목록 조회 실패: $e');
+      if (mounted) setState(() => _rewardsError = '받은 선물 목록을 불러오지 못했습니다.\n$e');
+    } finally {
+      if (mounted) setState(() => _isLoadingRewards = false);
     }
   }
 
   // 선물 열기 버튼 클릭 시 호출 (PATCH api/attendance/rewards/:reward_id/open/)
   Future<void> _openGift() async {
-    final rewardId = _summary?.today.reward?.id ?? 1;
+    if (_isOpeningGift || _isGiftOpened || _isLoading || _loadError != null)
+      return;
+    final rewardId = _summary?.today.reward?.id;
+    if (rewardId == null || rewardId <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아직 열 수 있는 출석 보상이 없습니다.')));
+      return;
+    }
+    setState(() => _isOpeningGift = true);
 
     try {
       final openedReward = await ApiService.openAttendanceReward(rewardId);
@@ -55,6 +97,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (!mounted) return;
       setState(() {
         _isGiftOpened = true;
+        _rewards.removeWhere((reward) => reward.id == openedReward.id);
         _rewards.insert(0, openedReward);
       });
 
@@ -116,9 +159,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('보상 수령에 실패했습니다: $e')));
+    } finally {
+      if (mounted) setState(() => _isOpeningGift = false);
     }
   }
 
@@ -131,8 +177,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.4),
-      builder: (context) =>
-          CalendarDialog(year: targetYear, month: targetMonth),
+      builder: (context) => CalendarDialog(
+        year: targetYear,
+        month: targetMonth,
+        todayDate: _summary?.today.date,
+      ),
     );
   }
 
@@ -170,6 +219,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+          : _loadError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_loadError!, textAlign: TextAlign.center),
+                    TextButton(
+                      onPressed: _loadAttendanceData,
+                      child: const Text('다시 불러오기'),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20.0,
@@ -222,7 +287,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            '오늘의 선물이\n도착했어요',
+            _hasReward ? '오늘의 선물이\n도착했어요' : '아직 열 수 있는\n선물이 없어요',
             textAlign: TextAlign.center,
             style: GoogleFonts.notoSansKr(
               fontSize: 22,
@@ -233,7 +298,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '산책을 마쳐서\n랜덤 액세서리를 받을 수 있어요',
+            _hasReward ? '산책을 마쳐서\n랜덤 액세서리를 받을 수 있어요' : '보상이 지급되면\n여기서 열 수 있어요',
             textAlign: TextAlign.center,
             style: GoogleFonts.notoSansKr(
               fontSize: 13,
@@ -247,7 +312,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: _isGiftOpened ? null : _openGift,
+              onPressed: !_hasReward || _isGiftOpened || _isOpeningGift
+                  ? null
+                  : _openGift,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF496B31),
                 disabledBackgroundColor: Colors.grey.shade300,
@@ -257,7 +324,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 elevation: 0,
               ),
               child: Text(
-                _isGiftOpened ? '열기 완료' : '열기',
+                _isOpeningGift
+                    ? '여는 중…'
+                    : _isGiftOpened
+                    ? '열기 완료'
+                    : _hasReward
+                    ? '열기'
+                    : '보상 없음',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -337,10 +410,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   : null;
 
               // 오늘 또는 선물 보상일 체크
-              final bool isToday = (index == 4); // 시안 상 금요일(4)이 선물 보상일
+              final bool isToday =
+                  item != null && item.date == _summary?.today.date;
               final bool isAttended =
                   (item?.attended ?? false) || (isToday && _isGiftOpened);
-              final bool isRewardDay = item?.isRewardDay ?? isToday;
+              final bool isRewardDay = item?.isRewardDay ?? false;
 
               Widget iconWidget;
               BoxDecoration circleDecoration;
@@ -450,7 +524,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          if (_rewards.isEmpty)
+          if (_isLoadingRewards)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(color: primaryGreen),
+            )
+          else if (_rewardsError != null)
+            Column(
+              children: [
+                Text(_rewardsError!, textAlign: TextAlign.center),
+                TextButton(
+                  onPressed: _loadRewards,
+                  child: const Text('선물 목록 다시 불러오기'),
+                ),
+              ],
+            )
+          else if (_rewards.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               child: Center(
@@ -694,8 +783,14 @@ class CrownStickerPainter extends CustomPainter {
 class CalendarDialog extends StatefulWidget {
   final int year;
   final int month;
+  final String? todayDate;
 
-  const CalendarDialog({super.key, required this.year, required this.month});
+  const CalendarDialog({
+    super.key,
+    required this.year,
+    required this.month,
+    this.todayDate,
+  });
 
   @override
   State<CalendarDialog> createState() => _CalendarDialogState();
@@ -704,6 +799,7 @@ class CalendarDialog extends StatefulWidget {
 class _CalendarDialogState extends State<CalendarDialog> {
   bool _isLoading = true;
   AttendanceCalendarResponse? _calendarData;
+  String? _calendarError;
 
   @override
   void initState() {
@@ -712,6 +808,10 @@ class _CalendarDialogState extends State<CalendarDialog> {
   }
 
   Future<void> _fetchCalendarData() async {
+    setState(() {
+      _isLoading = true;
+      _calendarError = null;
+    });
     try {
       final res = await ApiService.getAttendanceCalendar(
         year: widget.year,
@@ -724,14 +824,29 @@ class _CalendarDialogState extends State<CalendarDialog> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      debugPrint('출석 달력 조회 실패: $e');
+      setState(() {
+        _isLoading = false;
+        _calendarError = '출석 달력을 불러오지 못했습니다.';
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final int todayNum = 26;
-    final int totalDays = _calendarData?.days.length ?? 30;
+    // 출석 요약의 서버 날짜를 우선 사용하고, 없으면 기기의 오늘 날짜 사용.
+    final today = DateTime.tryParse(widget.todayDate ?? '') ?? DateTime.now();
+    final int totalDays = DateTime(widget.year, widget.month + 1, 0).day;
+    // 목록이 일부 날짜만 포함하거나 정렬되지 않아도 날짜별로 매칭한다.
+    final daysByDate = <String, AttendanceDayItem>{};
+    for (final item in _calendarData?.days ?? <AttendanceDayItem>[]) {
+      final date = DateTime.tryParse(item.date);
+      if (date != null &&
+          date.year == widget.year &&
+          date.month == widget.month) {
+        daysByDate['${date.year}-${date.month}-${date.day}'] = item;
+      }
+    }
     final firstDayOfMonth = DateTime(widget.year, widget.month, 1);
     final int startingWeekdayOffset = (firstDayOfMonth.weekday - 1) % 7;
     final int itemCount = totalDays + startingWeekdayOffset;
@@ -791,6 +906,19 @@ class _CalendarDialogState extends State<CalendarDialog> {
                     padding: EdgeInsets.symmetric(vertical: 40),
                     child: CircularProgressIndicator(color: primaryGreen),
                   )
+                : _calendarError != null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        Text(_calendarError!, textAlign: TextAlign.center),
+                        TextButton(
+                          onPressed: _fetchCalendarData,
+                          child: const Text('다시 불러오기'),
+                        ),
+                      ],
+                    ),
+                  )
                 : GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -807,27 +935,29 @@ class _CalendarDialogState extends State<CalendarDialog> {
                       }
 
                       final int day = index - startingWeekdayOffset + 1;
-                      final AttendanceDayItem? dayData =
-                          _calendarData != null &&
-                              (day - 1) < _calendarData!.days.length
-                          ? _calendarData!.days[day - 1]
-                          : null;
-
-                      final bool isAttended = dayData?.attended ?? (day < 26);
-                      final bool isToday = day == todayNum;
+                      final dayData =
+                          daysByDate['${widget.year}-${widget.month}-$day'];
+                      final bool isAttended = dayData?.attended ?? false;
+                      final bool isToday =
+                          today.year == widget.year &&
+                          today.month == widget.month &&
+                          today.day == day;
 
                       BoxDecoration decoration;
                       Color textColor;
 
                       if (isAttended) {
-                        // 열기 완료 날짜: 전체 초록색 원 + 흰색 숫자 (2번 이미지 25일 스타일)
-                        decoration = const BoxDecoration(
+                        // 실제 출석 날짜만 초록색으로 표시한다.
+                        decoration = BoxDecoration(
                           color: Color(0xFF86B453),
                           shape: BoxShape.circle,
+                          border: isToday
+                              ? Border.all(color: primaryGreen, width: 2)
+                              : null,
                         );
                         textColor = Colors.white;
                       } else if (isToday) {
-                        // 열기 전 당일 날짜: 두꺼운 초록 테두리 링 + 크림 배경 + 초록 숫자 (2번 이미지 26일 스타일)
+                        // 현재 월의 실제 오늘 날짜를 강조한다.
                         decoration = BoxDecoration(
                           color: const Color(0xFFFAF9E6),
                           shape: BoxShape.circle,

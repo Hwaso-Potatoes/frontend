@@ -1,5 +1,19 @@
 // lib/models/decoration_model.dart
 
+import 'package:flutter/material.dart';
+import '../config/api_config.dart';
+
+// ── 백엔드/디자인팀 확인 필요 목록 ──
+// 1. (디자인팀) 헤어/케이프/옷/신발 오버레이용 "품종별 앵커 좌표(x,y,scale)" 필요
+//    -> 지금은 전 품종 공통 임시 좌표(비율 추정치)로 처리, 나중에 세분화 필요
+// 2. (기획) 그리드에서 "장착 중"인 아이템을 시각적으로 구분해야 하는지 확인 필요
+//    -> 지금은 스타일 처리 없음, isEquipped 값만 상태로 관리
+// 3. (backend) "미보유" 악세사리까지 다 보여주려면 "전체 악세사리 카탈로그 조회" API 필요
+//    -> 지금 확인된 "보유 액세서리 조회"는 가진 것만 옴 (그래서 아래 더미 중 isOwned:false
+//       항목들은 실제 API로는 채울 방법이 아직 없음, 그리드 표시 확인용으로만 존재)
+// 4. (backend) category 값이 "HAIR"만 확인됨. CAPE/CLOTHES/SHOES도 같은 패턴(대문자)인지
+//    확인 필요 -> 지금은 그렇다고 가정하고 매핑함
+
 enum AccessoryCategory { hair, cape, clothes, shoes }
 
 extension AccessoryCategoryLabel on AccessoryCategory {
@@ -144,7 +158,7 @@ final List<AccessoryItem> dummyAccessories = [
     "accessory": {
       "id": 1,
       "name": "헤어핀1",
-      "image": "http://127.0.0.1:8000/media/accessories/IMG_2649_1.png",
+      "image": "$kApiBaseUrl/media/accessories/IMG_2649_1.png",
       "category": "HAIR",
     },
     "is_equipped": true,

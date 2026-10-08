@@ -14,7 +14,9 @@ class WalkReportScreen extends StatelessWidget {
     final String distanceStr =
         '${reportData.totalDistance.toStringAsFixed(1)}km';
     final String durationStr = _formatDuration(reportData.totalDurationStr);
-    final String caloriesStr = '${reportData.calories}kcal';
+    final String caloriesStr = reportData.hasCaloriesData
+        ? '${reportData.calories}kcal'
+        : '—';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9E5),
@@ -74,61 +76,62 @@ class WalkReportScreen extends StatelessWidget {
               ),
               const SizedBox(height: 18),
 
-              // 4. 진화 경험치 바
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3F6634),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '진화 경험치',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+              // 서버가 경험치 통계를 제공한 경우에만 표시한다.
+              if (reportData.hasExperienceData)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3F6634),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '진화 경험치',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            '+${reportData.earnedExp} XP',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: reportData.expRatio,
+                          minHeight: 10,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF88C15A),
                           ),
                         ),
-                        Text(
-                          '+${reportData.earnedExp} XP',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: reportData.expRatio,
-                        minHeight: 10,
-                        backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF88C15A),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '다음 진화까지 ${reportData.expToNextLevel} XP 남았어요',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white70,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '다음 진화까지 ${reportData.expToNextLevel} XP 남았어요',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
 
               // 5. 새로운 뱃지 획득 카드

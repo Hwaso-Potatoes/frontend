@@ -10,6 +10,7 @@
 //       지금은 GrowthLevelWidget에 기간별로 직접 값을 넣어두는 방식으로 임시 처리함
 
 import 'package:flutter/material.dart';
+import '../config/api_config.dart';
 import '../widgets/walk_distance_chart_card.dart';
 
 enum ReportPeriod { day, week, month, sixMonths, year }
@@ -68,7 +69,7 @@ class ReportData {
 /// 뱃지 예시 이미지 (실제 보유 뱃지 조회 API에서 확인된 URL 하나 재사용,
 /// 나머지는 더미로 같은 이미지 반복 - 실제 이미지 URL 필요)
 const String _sampleBadgeImage =
-    'http://127.0.0.1:8000/media/badges/%E1%84%8E%E1%85%A5%E1%86%BA_%E1%84%89%E1%85%A1%E1%86%AB%E1%84%8E%E1%85%A2%E1%86%A8_a32QEk7.png';
+    '$kApiBaseUrl/media/badges/%E1%84%8E%E1%85%A5%E1%86%BA_%E1%84%89%E1%85%A1%E1%86%AB%E1%84%8E%E1%85%A2%E1%86%A8_a32QEk7.png';
 
 /// 기간별 더미 데이터 (스크린샷 수치 기준으로 구성)
 final Map<ReportPeriod, ReportData> dummyReportData = {

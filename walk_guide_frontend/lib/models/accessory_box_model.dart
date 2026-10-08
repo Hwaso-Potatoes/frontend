@@ -28,6 +28,8 @@
 
 import 'dart:math';
 
+import '../config/api_config.dart';
+
 enum BoxRarity { common, rare, epic }
 
 extension BoxRarityLabel on BoxRarity {
@@ -117,7 +119,7 @@ final AccessoryBoxData dummyBoxData = AccessoryBoxData(
   rarity: BoxRarity.common,
   result: BoxAccessoryResult.fromJson({
     'name': '왕관 핀',
-    'image': 'http://127.0.0.1:8000/media/accessories/crown_pin.png',
+    'image': '$kApiBaseUrl/media/accessories/crown_pin.png',
     'category': 'HAIR',
   }),
 );

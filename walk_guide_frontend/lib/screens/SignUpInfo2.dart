@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // 💡 kIsWeb(웹 환경 체크)을 사용하기 위해 추가되었습니다.
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 import '../widgets/custom_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'SignUpInfo3.dart';
@@ -29,8 +27,6 @@ class SignUpInfo2 extends StatefulWidget {
 class _SignUpInfo2State extends State<SignUpInfo2> {
   final TextEditingController _petNameController = TextEditingController();
 
-  final ImagePicker _picker = ImagePicker();
-  String? _profileImagePath;
   String? _selectedBreed;
   DateTime _selectedDate = DateTime.now();
 
@@ -59,19 +55,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
   void dispose() {
     _petNameController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() {
-          _profileImagePath = image.path;
-        });
-      }
-    } catch (e) {
-      debugPrint('이미지 선택 오류: $e');
-    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -132,7 +115,7 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
           petName: petName,
           breed: _selectedBreed ?? '미정',
           birthDate: birthDate,
-          profileImage: _profileImagePath,
+          profileImage: null,
           accessToken: widget.accessToken,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -225,77 +208,6 @@ class _SignUpInfo2State extends State<SignUpInfo2> {
                           letterSpacing: -0.4,
                           color: Colors.black,
                           height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Center(
-                        child: GestureDetector(
-                          onTap: _pickImage,
-                          child: Stack(
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFEFF3C8),
-                                  border: Border.all(color: Colors.black12),
-                                ),
-                                // 💡 변경점: 웹(Chrome)과 앱을 분리하여 이미지를 다르게 불러옵니다.
-                                child: _profileImagePath != null
-                                    ? ClipOval(
-                                        child: kIsWeb
-                                            ? Image.network(
-                                                _profileImagePath!,
-                                                fit: BoxFit.cover,
-                                                width: 100,
-                                                height: 100,
-                                              )
-                                            : Image.file(
-                                                File(_profileImagePath!),
-                                                fit: BoxFit.cover,
-                                                width: 100,
-                                                height: 100,
-                                              ),
-                                      )
-                                    : Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: const [
-                                          Icon(
-                                            Icons.camera_alt_outlined,
-                                            size: 32,
-                                            color: Colors.black54,
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            '사진 등록',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.edit,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
