@@ -149,7 +149,7 @@ Future<void> showCustomDialog({
   );
 }
 
-// 공통 하단 네비게이션 바 위젯 (2번 시안과 100% 동일한 연두색 아웃라인 아이콘 & 흰색 컷아웃)
+// 화면 폭과 시스템 하단 여백에 맞춰 배치하는 공통 하단 메뉴.
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -162,17 +162,51 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const lightGreenColor = Color(0xFFA5D179);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+        // 돌출된 산책 버튼까지 실제 레이아웃 영역에 포함한다.
+        const barHeight = 94.0;
+        final desiredHeight = barHeight + bottomInset;
+        final designWidth = availableWidth < 304 ? 304.0 : availableWidth;
+        return SizedBox(
+          width: availableWidth,
+          height: constraints.constrainHeight(desiredHeight),
+          // 창 축소/전환 중 아주 작은 제약에서도 내부 Column이 넘치지 않는다.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: designWidth,
+              height: desiredHeight,
+              child: Column(
+                children: [
+                  SizedBox(height: barHeight, child: _buildBar()),
+                  if (bottomInset > 0)
+                    Container(height: bottomInset, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    return SizedBox(
-      height: 80,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
-        children: [
-          // 1. 하단 바 직사각형 흰색 배경
-          Container(
-            height: 62,
+  Widget _buildBar() {
+    const lightGreenColor = Color(0xFFA5D179);
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 62,
+          child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -184,58 +218,69 @@ class CustomBottomNavBar extends StatelessWidget {
               ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home_outlined, '홈', lightGreenColor),
-                _buildNavItem(
-                  1,
-                  Icons.crop_original_outlined,
-                  '리포트',
-                  lightGreenColor,
+                Expanded(
+                  child: _buildNavItem(
+                    0,
+                    Icons.home_outlined,
+                    '홈',
+                    lightGreenColor,
+                  ),
                 ),
-                const SizedBox(width: 72), // 중앙 원형 버튼 공간
-                _buildNavItem(
-                  3,
-                  Icons.group_outlined,
-                  '친구',
-                  lightGreenColor,
+                Expanded(
+                  child: _buildNavItem(
+                    1,
+                    Icons.crop_original_outlined,
+                    '리포트',
+                    lightGreenColor,
+                  ),
                 ),
-                _buildNavItem(
-                  4,
-                  Icons.person_outline_rounded,
-                  '프로필',
-                  lightGreenColor,
+                const SizedBox(width: 72),
+                Expanded(
+                  child: _buildNavItem(
+                    3,
+                    Icons.group_outlined,
+                    '친구',
+                    lightGreenColor,
+                  ),
+                ),
+                Expanded(
+                  child: _buildNavItem(
+                    4,
+                    Icons.person_outline_rounded,
+                    '프로필',
+                    lightGreenColor,
+                  ),
                 ),
               ],
             ),
           ),
-
-          // 2. 바 위로 솟아오르는 원형 하얀색 컷아웃 테두리
-          Positioned(
-            top: -14,
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
+        ),
+        Positioned(
+          top: 0,
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
           ),
-
-          // 3. 중앙 연두색 발바닥 원형 버튼 + '산책' 텍스트
-          Positioned(
-            top: -8,
-            child: GestureDetector(
-              onTap: () => onTap(2),
-              behavior: HitTestBehavior.opaque,
+        ),
+        Positioned(
+          top: 6,
+          child: GestureDetector(
+            onTap: () => onTap(2),
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: 72,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -243,7 +288,7 @@ class CustomBottomNavBar extends StatelessWidget {
                     width: 60,
                     height: 60,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFA5D179),
+                      color: lightGreenColor,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -253,55 +298,57 @@ class CustomBottomNavBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    '산책',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  const SizedBox(
+                    height: 18,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '산책',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-    String label,
-    Color lightGreenColor,
-  ) {
-    final bool isSelected = currentIndex == index;
-
+  Widget _buildNavItem(int index, IconData icon, String label, Color color) {
+    final isSelected = currentIndex == index;
     return InkWell(
       onTap: () => onTap(index),
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       child: SizedBox(
-        width: 58,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 28,
-              color: lightGreenColor,
+        height: 62,
+        width: double.infinity,
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 28, color: color),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                    color: isSelected ? Colors.black : Colors.black87,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                color: isSelected ? Colors.black : Colors.black87,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

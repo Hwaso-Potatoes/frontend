@@ -2,10 +2,12 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../models/accessory_box_model.dart';
 import '../widgets/box/touch_counter_dots.dart';
+import '../widgets/reward_accessory_image.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 
@@ -155,11 +157,16 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
     return '$directory/box_common.png';
   }
 
-  String get _resultName {
-    if (widget.reward == null) return widget.boxData!.result.name;
-    final name = _openedReward?.accessory?.name.trim();
-    return name == null || name.isEmpty ? '액세서리 정보 확인 중' : name;
-  }
+  int? get _resultAccessoryId => widget.reward == null
+      ? widget.boxData!.result.id
+      : _openedReward?.accessory?.id;
+
+  String get _resultName => rewardAccessoryDisplayName(
+    _resultAccessoryId,
+    widget.reward == null
+        ? widget.boxData!.result.name
+        : _openedReward?.accessory?.name,
+  );
 
   String get _resultSubtitle {
     if (widget.reward != null && _openedReward?.accessory == null) {
@@ -185,33 +192,13 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
     }
   }
 
-  Widget _resultIcon(double size) {
-    final rawImage = widget.reward == null
+  Widget _resultIcon(double size) => RewardAccessoryImage(
+    accessoryId: _resultAccessoryId,
+    serverImage: widget.reward == null
         ? widget.boxData!.result.image
-        : _openedReward?.accessory?.image;
-    final image = ApiService.resolveMediaUrl(rawImage);
-    Widget fallback() => Icon(
-      Icons.auto_awesome,
-      size: size * 0.7,
-      color: const Color(0xFF496B31),
-    );
-    if (image == null || image.isEmpty) return fallback();
-    return SizedBox(
-      width: size,
-      height: size,
-      child: image.startsWith('assets/')
-          ? Image.asset(
-              image,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => fallback(),
-            )
-          : Image.network(
-              image,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => fallback(),
-            ),
-    );
-  }
+        : _openedReward?.accessory?.image,
+    size: size,
+  );
 
   void _leave({bool goHome = false, bool goToDecorate = false}) {
     if (_opening || _allowPop) return;
@@ -251,6 +238,10 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
 
   @override
   Widget build(BuildContext context) {
+    final boxSize = math.min(
+      299.0,
+      math.max(0.0, MediaQuery.sizeOf(context).width - 48),
+    );
     return PopScope<Object?>(
       canPop: _allowPop || (!_opening && (widget.reward == null || !_opened)),
       onPopInvokedWithResult: (didPop, result) {
@@ -269,13 +260,12 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                   children: [
                     // 타이틀 위치를 좀 더 아래로 (44 -> 70)
                     const SizedBox(height: 70),
-                    const Text(
+                    Text(
                       '액세서리 박스',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w800,
-                        fontSize: 40,
+                      style: GoogleFonts.notoSansKr(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 32,
                         height: 1.1,
                         color: Colors.black,
                       ),
@@ -284,9 +274,8 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                     Text(
                       _opened ? '새 액세서리를 획득했어요' : '박스를 터치해서 열어보세요',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.notoSansKr(
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                         height: 1.0,
                         color: const Color(0xFF636037).withOpacity(0.75),
@@ -298,8 +287,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                     if (!_opened) ...[
                       Text(
                         _rarityLabel,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
+                        style: GoogleFonts.notoSansKr(
                           fontWeight: FontWeight.w800,
                           fontSize: 32,
                           height: 1.1,
@@ -312,13 +300,13 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                         child: GestureDetector(
                           onTap: _handleBoxTap,
                           child: SizedBox(
-                            width: 299,
-                            height: 299,
+                            width: boxSize,
+                            height: boxSize,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 Container(
-                                  width: 265,
+                                  width: math.min(265.0, boxSize),
                                   height: 226,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFECEDD6),
@@ -346,8 +334,8 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                                   },
                                   child: Image.asset(
                                     _boxImagePath,
-                                    width: 299,
-                                    height: 299,
+                                    width: boxSize,
+                                    height: boxSize,
                                     errorBuilder: (context, error, stackTrace) {
                                       return const Icon(
                                         Icons.card_giftcard,
@@ -380,8 +368,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                             : _openError != null
                             ? '선물 열기에 실패했어요'
                             : '${kBoxRequiredTaps - _tapCount}번 더 터치하면 열려요',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
+                        style: GoogleFonts.notoSansKr(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                           color: const Color(0xFF636037).withOpacity(0.75),
@@ -392,7 +379,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                         Text(_openError!, textAlign: TextAlign.center),
                         TextButton(
                           onPressed: _openAttendanceReward,
-                          child: const Text('다시 시도'),
+                          child: Text('다시 시도'),
                         ),
                       ],
                     ] else ...[
@@ -442,8 +429,8 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                           },
                           // 배경 카드 265x226 -> 190x160 (좀 더 작게)
                           child: Container(
-                            width: 190,
-                            height: 160,
+                            width: math.min(265.0, boxSize),
+                            height: 226,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: const Color(0xFFECEDD6),
@@ -454,7 +441,7 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                               // AccessoryIcon에 size를 명시해야 함 (안 그러면
                               // 기본값 48로 고정되거나 반대로 배경보다 커져서
                               // 삐져나올 수 있음). 배경(160)보다 확실히 작게.
-                              child: _resultIcon(130),
+                              child: _resultIcon(170),
                             ),
                           ),
                         ),
@@ -465,8 +452,11 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                       // ── 설명 카드 ──
                       Container(
                         width: double.infinity,
-                        height: 89,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        constraints: const BoxConstraints(minHeight: 89),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(15),
@@ -503,10 +493,9 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                                 children: [
                                   Text(
                                     _resultName,
-                                    style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
+                                    style: GoogleFonts.notoSansKr(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 17,
                                       height: 1.1,
                                       color: Colors.black,
                                     ),
@@ -514,9 +503,8 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                                   const SizedBox(height: 4),
                                   Text(
                                     _resultSubtitle,
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontWeight: FontWeight.w600,
+                                    style: GoogleFonts.notoSansKr(
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 10,
                                       color: const Color(
                                         0xFF636037,
@@ -551,10 +539,9 @@ class _AccessoryBoxScreenState extends State<AccessoryBoxScreen>
                               ),
                             ],
                           ),
-                          child: const Text(
+                          child: Text(
                             '홈으로',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
+                            style: GoogleFonts.notoSansKr(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
                               color: Colors.white,

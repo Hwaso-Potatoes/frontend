@@ -25,12 +25,12 @@ class PersonalityTag extends StatelessWidget {
   Widget build(BuildContext context) {
     if (homeStyle) {
       const colors = {
-        '에너지형': Color(0xFFFCF9CA),
-        '사회성형': Color(0xFFC9E7E4),
-        '겁쟁이형': Color(0xFFF5DBE4),
-        '호기심형': Color(0xFFE7E4B7),
-        '느긋형': Color(0xFFCBE9CF),
-        '얌전형': Color(0xFFE5E2DD),
+        '에너지형': Color(0xFFFFF9C4),
+        '사회성형': Color(0xFFBBE8E4),
+        '겁쟁이형': Color(0xFFFFD9E4),
+        '호기심형': Color(0xFFEAE4B1),
+        '느긋형': Color(0xFFBEEBCD),
+        '얌전형': Color(0xFFE6E2DC),
       };
       const icons = {
         '에너지형': Icons.bolt_outlined,

@@ -125,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
   );
   Widget _buildHome(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.white,
       body: FutureBuilder<HomeDashboardResponse>(
         future: _homeDataFuture,
         builder: (context, snapshot) {
@@ -193,9 +193,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final int walkPercentage = (walkRatio * 100).toInt();
 
           return Container(
-            color: backgroundColor,
+            color: Colors.white,
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -343,30 +343,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 50),
-                      const Text(
-                        '좋은 아침이에요',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF7A7955),
-                          height: 1.0,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 50),
+                        const Text(
+                          '좋은 아침이에요',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF7A7955),
+                            height: 1.0,
+                          ),
                         ),
-                      ),
-                      Text(
-                        userName,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 31,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                          height: 1.1,
+                        Text(
+                          userName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 31,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                            height: 1.1,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 12),
                   GestureDetector(
                     onTap: _navigateToDecorationScreen,
                     child: Padding(
@@ -612,32 +617,38 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 18),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '오늘의 산책 권장량',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black45,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '오늘의 산책 권장량',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black45,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${data.targetDistance}km 중 ${data.currentDistance}km 완료',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black,
+                const SizedBox(height: 2),
+                Text(
+                  '${_formatDistanceKm(data.targetDistance)}km 중 ${_formatDistanceKm(data.currentDistance)}km 완료',
+                  softWrap: true,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+
+  String _formatDistanceKm(double value) =>
+      value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
 
   Widget _buildWalkingFriendsSection(List<FriendDogDisplay> friends) {
     return Column(
