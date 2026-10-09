@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../models/friend_model.dart';
+import '../services/api_service.dart';
 import '../widgets/friend_list_item.dart';
 import '../widgets/friend_detail_dialog.dart';
 import '../widgets/friend_delete_feedback.dart';
@@ -20,6 +21,7 @@ class _AllFriendsScreenState extends State<AllFriendsScreen>
     with FriendDeleteFeedback<AllFriendsScreen> {
   List<Friend> _friends = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -28,13 +30,25 @@ class _AllFriendsScreenState extends State<AllFriendsScreen>
   }
 
   Future<void> _loadFriends() async {
-    // TODO(backend): mockFetchMyFriends() -> 실제 GET api/friends/ 호출로 교체
-    final friends = await mockFetchMyFriends();
     if (!mounted) return;
     setState(() {
-      _friends = friends;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      final friends = await ApiService.getMyFriends();
+      if (!mounted) return;
+      setState(() => _friends = friends);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error is ApiException
+            ? error.message
+            : '친구 목록을 불러오지 못했습니다. 다시 시도해주세요.';
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _showFriend(Friend friend) async {
@@ -95,6 +109,44 @@ class _AllFriendsScreenState extends State<AllFriendsScreen>
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
                     child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_loadError != null)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _loadError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              color: Color(0xFF636037),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _loadFriends,
+                            child: const Text(
+                              '다시 시도',
+                              style: TextStyle(color: Color(0xFF386628)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_friends.isEmpty)
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        '아직 등록된 친구가 없어요.',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: Color(0xFF636037),
+                        ),
+                      ),
+                    ),
                   )
                 else
                   Expanded(

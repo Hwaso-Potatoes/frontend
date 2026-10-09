@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import 'decorate_screen.dart';
+import 'accessory_box_screen.dart' as attendance_box;
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF496B31);
@@ -18,6 +19,7 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _isLoading = true;
   AttendanceSummaryResponse? _summary;
+  AttendanceRewardItem? _todayReward;
   List<AttendanceRewardItem> _rewards = [];
   bool _isGiftOpened = false;
   bool _isOpeningGift = false;
@@ -25,7 +27,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String? _rewardsError;
   bool _isLoadingRewards = false;
 
-  bool get _hasReward => (_summary?.today.reward?.id ?? 0) > 0;
+  bool get _hasReward => (_todayReward?.id ?? 0) > 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (!mounted) return;
       setState(() {
         _summary = summaryRes;
+        _todayReward = summaryRes.today.reward;
         _isGiftOpened = summaryRes.today.reward?.opened ?? false;
         _isLoading = false;
       });
@@ -78,11 +81,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  // 선물 열기 버튼 클릭 시 호출 (PATCH api/attendance/rewards/:reward_id/open/)
+  // 상자 화면으로 이동하고, 네 번째 터치 시 그 화면에서 보상 API를 호출한다.
   Future<void> _openGift() async {
-    if (_isOpeningGift || _isGiftOpened || _isLoading || _loadError != null)
-      return;
-    final rewardId = _summary?.today.reward?.id;
+    if (_isOpeningGift || _isLoading || _loadError != null) return;
+    final reward = _todayReward;
+    final rewardId = reward?.id;
     if (rewardId == null || rewardId <= 0) {
       ScaffoldMessenger.of(
         context,
@@ -92,72 +95,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     setState(() => _isOpeningGift = true);
 
     try {
-      final openedReward = await ApiService.openAttendanceReward(rewardId);
-
+      final result = await Navigator.of(context)
+          .push<attendance_box.AccessoryBoxResult>(
+            MaterialPageRoute(
+              builder: (_) =>
+                  attendance_box.AccessoryBoxScreen(reward: reward!),
+            ),
+          );
       if (!mounted) return;
+      if (result == null) {
+        // 중간 이탈/응답 유실 후에도 서버의 최신 보상 상태로 다시 맞춘다.
+        await _loadAttendanceData();
+        return;
+      }
+      final openedReward = result.reward;
       setState(() {
-        _isGiftOpened = true;
+        _isGiftOpened = openedReward.opened;
+        _todayReward = openedReward;
         _rewards.removeWhere((reward) => reward.id == openedReward.id);
-        _rewards.insert(0, openedReward);
+        if (openedReward.opened) _rewards.insert(0, openedReward);
       });
-
-      final accessoryName = openedReward.accessory?.name ?? '하트 핀';
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text('🎁 선물 도착!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              StickerIconWidget(
-                name: accessoryName,
-                category: openedReward.accessory?.category,
-                size: 64,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '축하합니다!\n랜덤 액세서리 "$accessoryName"을 획득했습니다!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('확인', style: TextStyle(color: Colors.black54)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _navigateToDecorateScreen(accessoryName);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF86B453),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                '꾸미러 가기 >',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      if (result.goHome) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else if (result.goToDecorate) {
+        _navigateToDecorateScreen(openedReward.accessory?.name);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -166,6 +128,44 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     } finally {
       if (mounted) setState(() => _isOpeningGift = false);
     }
+  }
+
+  Widget _rewardThumbnail(AttendanceRewardItem reward) {
+    final accessory = reward.accessory;
+    final image = ApiService.resolveMediaUrl(accessory?.image);
+    Widget fallback() => StickerIconWidget(
+      name: accessory?.name ?? '',
+      category: accessory?.category,
+      size: 52,
+    );
+    if (image == null || image.isEmpty) {
+      // image가 없으면 네트워크 요청도 없으므로 HTTP 오류가 발생하지 않는다.
+      debugPrint('[출석 보상 ${reward.id}] 이미지 경로 없음 또는 지원하지 않는 형식: 기존 아이콘 표시');
+      return fallback();
+    }
+    Widget onImageError(Object error) {
+      // 이미지 위젯의 비동기 오류는 목록 API의 catch로 전달되지 않는다.
+      debugPrint(
+        '[출석 보상 ${reward.id}] 이미지 로딩 실패 (${error.runtimeType}): 기존 아이콘 표시',
+      );
+      return fallback();
+    }
+
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: image.startsWith('assets/')
+          ? Image.asset(
+              image,
+              fit: BoxFit.contain,
+              errorBuilder: (_, error, ___) => onImageError(error),
+            )
+          : Image.network(
+              image,
+              fit: BoxFit.contain,
+              errorBuilder: (_, error, ___) => onImageError(error),
+            ),
+    );
   }
 
   // 달력 팝업창 띄우기 (GET api/attendance/calendar/?year=year&month=month 연동)
@@ -298,7 +298,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _hasReward ? '산책을 마쳐서\n랜덤 액세서리를 받을 수 있어요' : '보상이 지급되면\n여기서 열 수 있어요',
+            _hasReward ? '출석 보상으로\n액세서리를 받을 수 있어요' : '보상이 지급되면\n여기서 열 수 있어요',
             textAlign: TextAlign.center,
             style: GoogleFonts.notoSansKr(
               fontSize: 13,
@@ -312,9 +312,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: !_hasReward || _isGiftOpened || _isOpeningGift
-                  ? null
-                  : _openGift,
+              onPressed: !_hasReward || _isOpeningGift ? null : _openGift,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF496B31),
                 disabledBackgroundColor: Colors.grey.shade300,
@@ -327,7 +325,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 _isOpeningGift
                     ? '여는 중…'
                     : _isGiftOpened
-                    ? '열기 완료'
+                    ? '선물 보기'
                     : _hasReward
                     ? '열기'
                     : '보상 없음',
@@ -554,27 +552,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             )
           else
             ..._rewards.map((reward) {
-              final name = reward.accessory?.name ?? '넥타이 케이프';
+              final name = reward.accessory?.name.trim();
+              final label = name == null || name.isEmpty
+                  ? '액세서리 정보 확인 중'
+                  : name;
               final dayText = _formatDayText(reward.attendanceDate);
 
               return Column(
                 children: [
                   InkWell(
-                    onTap: () => _navigateToDecorateScreen(name),
+                    onTap: reward.accessory == null
+                        ? null
+                        : () => _navigateToDecorateScreen(label),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Row(
                         children: [
-                          StickerIconWidget(
-                            name: name,
-                            category: reward.accessory?.category,
-                            size: 52,
-                          ),
+                          _rewardThumbnail(reward),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Text(
-                              name,
+                              label,
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -650,17 +649,25 @@ class StickerIconWidget extends StatelessWidget {
   }
 
   Widget _buildStickerGraphic() {
-    if (name.contains('넥타이') || name.contains('케이프') || category == 'CAPE') {
+    final normalizedCategory = category?.trim().toUpperCase();
+    if (name.contains('넥타이') ||
+        name.contains('케이프') ||
+        normalizedCategory == 'CAPE') {
       return CustomPaint(painter: TieCapeStickerPainter());
     } else if (name.contains('하트') ||
         name.contains('핀') ||
-        category == 'PIN' ||
-        category == 'HAIR') {
+        name.contains('헤어') ||
+        normalizedCategory == 'PIN' ||
+        normalizedCategory == 'HAIR') {
       return CustomPaint(painter: HeartPinStickerPainter());
-    } else if (name.contains('왕관') || category == 'CROWN') {
+    } else if (name.contains('왕관') || normalizedCategory == 'CROWN') {
       return CustomPaint(painter: CrownStickerPainter());
     }
-    return const Icon(Icons.star_rounded, color: Color(0xFFE5B537), size: 28);
+    return const Icon(
+      Icons.image_not_supported_outlined,
+      color: Color(0xFF636037),
+      size: 28,
+    );
   }
 }
 

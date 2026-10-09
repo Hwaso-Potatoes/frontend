@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../models/friend_model.dart';
+import '../services/api_service.dart';
 import '../widgets/friend_list_item.dart';
 import '../widgets/friend_detail_dialog.dart';
 import '../widgets/friend_delete_feedback.dart';
@@ -30,6 +31,7 @@ class _FriendScreenState extends State<FriendScreen>
   List<Friend> _allFriends = [];
   List<Friend> _filteredFriends = [];
   bool _isLoadingFriends = true;
+  String? _friendsError;
 
   @override
   void initState() {
@@ -46,21 +48,37 @@ class _FriendScreenState extends State<FriendScreen>
   }
 
   Future<void> _loadFriends() async {
-    final friends = await mockFetchMyFriends();
     if (!mounted) return;
     setState(() {
-      _allFriends = friends;
-      final query = _searchController.text.trim().toLowerCase();
-      _filteredFriends = friends
-          .where(
-            (f) =>
-                query.isEmpty ||
-                f.nickname.toLowerCase().contains(query) ||
-                (f.primaryPet?.name.toLowerCase().contains(query) ?? false),
-          )
-          .toList();
-      _isLoadingFriends = false;
+      _isLoadingFriends = true;
+      _friendsError = null;
     });
+    try {
+      final friends = await ApiService.getMyFriends();
+      if (!mounted) return;
+      setState(() {
+        _allFriends = friends;
+        final query = _searchController.text.trim().toLowerCase();
+        _filteredFriends = friends
+            .where(
+              (friend) =>
+                  query.isEmpty ||
+                  friend.nickname.toLowerCase().contains(query) ||
+                  (friend.primaryPet?.name.toLowerCase().contains(query) ??
+                      false),
+            )
+            .toList();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _friendsError = error is ApiException
+            ? error.message
+            : '친구 목록을 불러오지 못했습니다. 다시 시도해주세요.';
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingFriends = false);
+    }
   }
 
   void _onSearchChanged() {
@@ -79,13 +97,14 @@ class _FriendScreenState extends State<FriendScreen>
     });
   }
 
-  void _navigateToQrAddScreen() {
-    Navigator.push(
+  Future<void> _navigateToQrAddScreen() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const QrFriendAddScreen(initialTab: QrTab.myQr),
       ),
     );
+    if (mounted) await _loadFriends();
   }
 
   Future<void> _goToAllFriends() async {
@@ -248,12 +267,42 @@ class _FriendScreenState extends State<FriendScreen>
                       child: CircularProgressIndicator(color: qrButtonGreen),
                     ),
                   )
+                else if (_friendsError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _friendsError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _loadFriends,
+                            child: const Text(
+                              '다시 시도',
+                              style: TextStyle(color: Color(0xFF386628)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 else if (previewFriends.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Center(
                       child: Text(
-                        '검색된 친구가 없어요',
+                        _searchController.text.trim().isEmpty
+                            ? '아직 등록된 친구가 없어요'
+                            : '검색된 친구가 없어요',
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 13,
