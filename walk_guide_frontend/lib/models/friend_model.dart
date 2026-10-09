@@ -77,15 +77,21 @@ class Friend {
   FriendPet? get primaryPet => pets.isNotEmpty ? pets.first : null;
 
   factory Friend.fromJson(Map<String, dynamic> json) {
-    final petsJson = json['pets'] as List<dynamic>? ?? [];
+    final petsJson = json['pets'] ?? const [];
+    if (petsJson is! List) {
+      throw const FormatException('친구의 pets 응답은 배열이어야 합니다.');
+    }
     return Friend(
       id: json['id'] is int
           ? json['id']
           : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       nickname: json['nickname']?.toString() ?? '',
-      pets: petsJson
-          .map((p) => FriendPet.fromJson(p as Map<String, dynamic>))
-          .toList(),
+      pets: petsJson.map<FriendPet>((pet) {
+        if (pet is! Map) {
+          throw const FormatException('친구의 반려견 응답 형식이 올바르지 않습니다.');
+        }
+        return FriendPet.fromJson(Map<String, dynamic>.from(pet));
+      }).toList(),
       isWalkingNow: false,
       walkStatusText: '',
     );

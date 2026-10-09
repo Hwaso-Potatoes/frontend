@@ -1493,6 +1493,30 @@ class ApiService {
     return reward;
   }
 
+  /// 실제 친구 목록 조회. 이 화면에는 목데이터를 반환하지 않는다.
+  /// GET /api/friends/ → [{id, nickname, pets: [{id, name, breed}]}]
+  static Future<List<Friend>> getMyFriends({String? token}) async {
+    final response = await _authenticatedRequest(
+      'GET',
+      '/api/friends/',
+      '친구 목록 조회',
+      token: token,
+    );
+    // 명세의 배열 응답과 목록 래퍼를 지원한다.
+    final dynamic items = response is Map
+        ? response['results'] ?? response['data']
+        : response;
+    if (items is! List) {
+      throw const FormatException('친구 목록 응답이 배열 형식이 아닙니다.');
+    }
+    return items.map<Friend>((item) {
+      if (item is! Map) {
+        throw const FormatException('친구 항목의 응답 형식이 올바르지 않습니다.');
+      }
+      return Friend.fromJson(Map<String, dynamic>.from(item));
+    }).toList();
+  }
+
   // [POST api/friends/qr/ - 나의 QR 생성 API]
   static Future<QrCodeGenerateResponse> generateMyQrCode({
     String? token,
