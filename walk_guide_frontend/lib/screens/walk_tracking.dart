@@ -30,8 +30,12 @@ class FriendLocation {
       userId: json['user_id'] is int
           ? json['user_id']
           : int.parse(json['user_id'].toString()),
-      name: (json['pet_name'] ?? json['name'] ?? '친구 ${json['user_id']}')
-          .toString(),
+      name:
+          (json['pet_name'] ??
+                  json['name'] ??
+                  json['nickname'] ??
+                  '친구 ${json['user_id']}')
+              .toString(),
       latitude: double.parse(json['latitude'].toString()),
       longitude: double.parse(json['longitude'].toString()),
       profileImage: ApiService.resolveMediaUrl(
@@ -79,6 +83,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   WebSocketChannel? _friendsChannel;
   StreamSubscription<dynamic>? _friendsSubscription;
   Timer? _friendsRetryTimer;
+  Timer? _nearbyRefreshTimer;
   int _friendsGeneration = 0;
   int _friendsRetryCount = 0;
   bool _appActive = true;
@@ -137,12 +142,12 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     }
   }
 
-  // 백엔드 인증 명세: ws/walks/:walk_id/?token=ACCESS_TOKEN.
+  // 주변 친구 조회: ws/nearby/. JWT는 기존 서버 안내대로 token 쿼리 사용.
   // 별도 실행 옵션 없이도 저장된 JWT를 token 쿼리로 전달한다.
-  Future<Uri> _friendsSocketUri(int walkId) async {
+  Future<Uri> _friendsSocketUri() async {
     final api = Uri.parse(ApiService.baseUrl);
     final uri = api
-        .resolve('/ws/walks/$walkId/')
+        .resolve('/ws/nearby/')
         .replace(scheme: api.scheme == 'https' ? 'wss' : 'ws');
     const configuredQuery = String.fromEnvironment(
       'WALK_WS_TOKEN_QUERY',
@@ -161,14 +166,13 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   Future<void> _connectFriends() async {
     if (!_shouldConnectFriends || _friendsChannel != null) return;
     final generation = ++_friendsGeneration;
-    final walkId = _walkId!;
     setState(() => _friendsError = null);
     try {
       final ownId = int.tryParse(await ApiService.getUserId() ?? '');
       if (ownId == null) {
         throw ApiException(401, '내 위치를 구별할 로그인 정보를 확인하지 못했습니다.');
       }
-      final uri = await _friendsSocketUri(walkId);
+      final uri = await _friendsSocketUri();
       if (!_shouldConnectFriends || generation != _friendsGeneration) return;
       _currentUserId = ownId;
       final channel = WebSocketChannel.connect(uri);
@@ -189,12 +193,40 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
         _friendsConnected = true;
         _friendsError = null;
       });
+      _sendNearbyLocation();
+      if (generation != _friendsGeneration || !_shouldConnectFriends) return;
+      // GPS가 정지한 상태에서도 새로 산책을 시작한 친구 목록을 재조회한다.
+      _nearbyRefreshTimer?.cancel();
+      _nearbyRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        if (generation == _friendsGeneration) _sendNearbyLocation();
+      });
     } catch (error) {
       _friendsConnectionFailed(
         generation,
         message: error is ApiException ? error.message : null,
         retry: error is! ApiException || !error.isUnauthorized,
       );
+    }
+  }
+
+  void _sendNearbyLocation() {
+    final position = _lastPosition;
+    final channel = _friendsChannel;
+    if (!_shouldConnectFriends ||
+        !_friendsConnected ||
+        position == null ||
+        channel == null)
+      return;
+    try {
+      channel.sink.add(
+        jsonEncode({
+          'type': 'my_location',
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+        }),
+      );
+    } catch (_) {
+      _friendsConnectionFailed(_friendsGeneration);
     }
   }
 
@@ -207,37 +239,51 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
           : message;
       if (decoded is! Map) return;
       final json = Map<String, dynamic>.from(decoded);
-      final friend = FriendLocation.fromJson(json);
-      if (friend.userId <= 0 ||
-          friend.userId == _currentUserId ||
-          !friend.latitude.isFinite ||
-          !friend.longitude.isFinite ||
-          friend.latitude.abs() > 90 ||
-          friend.longitude.abs() > 180)
+      if (json['type'] == 'error') {
+        setState(() {
+          _nearbyFriends.clear();
+          _friendsError = json['message']?.toString() ?? '주변 친구 조회에 실패했습니다.';
+        });
         return;
-      final index = _nearbyFriends.indexWhere((f) => f.userId == friend.userId);
-      final previous = index < 0 ? null : _nearbyFriends[index];
-      setState(() {
-        // 최소 명세에는 이름/사진이 없으므로 기존 메타데이터를 보존한다.
-        final updated = FriendLocation(
-          userId: friend.userId,
-          name: json['pet_name'] == null && json['name'] == null
-              ? previous?.name ?? friend.name
-              : friend.name,
-          latitude: friend.latitude,
-          longitude: friend.longitude,
-          profileImage: friend.profileImage ?? previous?.profileImage,
-        );
-        if (index < 0) {
-          _nearbyFriends.add(updated);
-        } else {
-          _nearbyFriends[index] = updated;
+      }
+      if (json['type'] != 'nearby_friends') return;
+      final rows = json['friends'];
+      if (rows is! List) throw const FormatException('friends 배열이 없습니다.');
+      final byUser = <int, FriendLocation>{};
+      var invalidRows = false;
+      for (final row in rows) {
+        try {
+          if (row is! Map) throw const FormatException('친구 형식 오류');
+          // latitude/longitude는 기존 좌표 명세의 필드 사용.
+          // nearby 응답에 다른 구조를 쓰는지는 전체 응답으로 확인해야 한다.
+          final friend = FriendLocation.fromJson(
+            Map<String, dynamic>.from(row),
+          );
+          if (friend.userId == _currentUserId) continue;
+          if (friend.userId <= 0 ||
+              !friend.latitude.isFinite ||
+              !friend.longitude.isFinite ||
+              friend.latitude.abs() > 90 ||
+              friend.longitude.abs() > 180) {
+            throw const FormatException('친구 좌표 오류');
+          }
+          byUser[friend.userId] = friend;
+        } catch (_) {
+          invalidRows = true;
         }
+      }
+      setState(() {
+        // 전체 목록으로 교체: 종료/공유 해제/반경 밖 친구의 이전 핀도 제거.
+        _nearbyFriends = byUser.values.toList();
         _friendsRetryCount = 0;
+        _friendsError = invalidRows ? '친구 좌표 응답 형식을 확인해야 합니다.' : null;
       });
     } catch (_) {
-      // 다른 이벤트/잘못된 좌표 하나 때문에 수신 스트림을 종료하지 않는다.
-      debugPrint('친구 위치 메시지의 필수 필드 또는 좌표 형식이 올바르지 않습니다.');
+      if (!mounted) return;
+      setState(() {
+        _nearbyFriends.clear();
+        _friendsError = '주변 친구 응답 형식을 확인해야 합니다.';
+      });
     }
   }
 
@@ -264,6 +310,8 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   void _stopFriendsConnection({bool resetRetry = true}) {
     // 이미 닫힌 연결의 지연 콜백은 새 연결에 영향을 주지 않는다.
     _friendsGeneration++;
+    _nearbyRefreshTimer?.cancel();
+    _nearbyRefreshTimer = null;
     _friendsRetryTimer?.cancel();
     _friendsRetryTimer = null;
     final subscription = _friendsSubscription;
@@ -425,6 +473,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     });
 
     _queueLocation(position);
+    _sendNearbyLocation();
     try {
       _mapController.move(_currentLatLng, 17.0);
     } catch (_) {}
