@@ -16,6 +16,7 @@ class FriendLocation {
   final double latitude;
   final double longitude;
   final String? profileImage;
+  final String breed;
 
   FriendLocation({
     required this.userId,
@@ -23,6 +24,7 @@ class FriendLocation {
     required this.latitude,
     required this.longitude,
     this.profileImage,
+    this.breed = '',
   });
 
   factory FriendLocation.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class FriendLocation {
               .toString(),
       latitude: double.parse(json['latitude'].toString()),
       longitude: double.parse(json['longitude'].toString()),
+      breed: json['breed']?.toString() ?? '',
       profileImage: ApiService.resolveMediaUrl(
         json['profile_image']?.toString(),
       ),
@@ -84,6 +87,10 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   StreamSubscription<dynamic>? _friendsSubscription;
   Timer? _friendsRetryTimer;
   Timer? _nearbyRefreshTimer;
+  Timer? _lastMarkersExpiry;
+  bool _friendsConnecting = false;
+  final Map<int, String> _friendBreeds = {};
+  final Map<int, String> _friendPetNames = {};
   int _friendsGeneration = 0;
   int _friendsRetryCount = 0;
   bool _appActive = true;
@@ -107,17 +114,38 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadFriendPetInfo());
     _initWalkSession();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 일시적인 포커스 상실(inactive)에는 연결을 유지한다.
+    if (state == AppLifecycleState.inactive) return;
     _appActive = state == AppLifecycleState.resumed;
     if (_appActive) {
       _syncFriendsConnection();
     } else {
       _stopFriendsConnection();
       if (mounted) setState(() => _nearbyFriends.clear());
+    }
+  }
+
+  Future<void> _loadFriendPetInfo() async {
+    if (ApiService.useMockData) return;
+    try {
+      final friends = await ApiService.getMyFriends();
+      if (!mounted) return;
+      setState(() {
+        for (final friend in friends) {
+          final pet = friend.primaryPet;
+          if (pet == null) continue;
+          _friendBreeds[friend.id] = pet.breed;
+          _friendPetNames[friend.id] = pet.name;
+        }
+      });
+    } catch (_) {
+      debugPrint('[nearby] 친구 견종 정보를 불러오지 못했습니다.');
     }
   }
 
@@ -164,9 +192,15 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   }
 
   Future<void> _connectFriends() async {
-    if (!_shouldConnectFriends || _friendsChannel != null) return;
+    if (!_shouldConnectFriends || _friendsChannel != null || _friendsConnecting)
+      return;
+    _friendsConnecting = true;
     final generation = ++_friendsGeneration;
-    setState(() => _friendsError = null);
+    setState(
+      () => _friendsError = _lastMarkersExpiry != null
+          ? '연결 복구 중 · 마지막 위치 표시'
+          : null,
+    );
     try {
       final ownId = int.tryParse(await ApiService.getUserId() ?? '');
       if (ownId == null) {
@@ -184,14 +218,24 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
           }
         },
         onError: (Object error) => _friendsConnectionFailed(generation),
-        onDone: () => _friendsConnectionFailed(generation),
+        onDone: () {
+          if (generation != _friendsGeneration) return;
+          final code = channel.closeCode;
+          debugPrint('[nearby] 연결 종료: code=${code ?? "없음"}');
+          _friendsConnectionFailed(
+            generation,
+            message: '연결 복구 중 · 마지막 위치 표시${code == null ? "" : " (종료 $code)"}',
+          );
+        },
         cancelOnError: true,
       );
       await channel.ready.timeout(const Duration(seconds: 12));
       if (generation != _friendsGeneration || !_shouldConnectFriends) return;
       setState(() {
         _friendsConnected = true;
-        _friendsError = null;
+        _friendsError = _lastMarkersExpiry != null
+            ? '다시 연결됨 · 위치 갱신 대기 중'
+            : null;
       });
       _sendNearbyLocation();
       if (generation != _friendsGeneration || !_shouldConnectFriends) return;
@@ -206,6 +250,8 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
         message: error is ApiException ? error.message : null,
         retry: error is! ApiException || !error.isUnauthorized,
       );
+    } finally {
+      if (generation == _friendsGeneration) _friendsConnecting = false;
     }
   }
 
@@ -274,6 +320,8 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
       }
       setState(() {
         // 전체 목록으로 교체: 종료/공유 해제/반경 밖 친구의 이전 핀도 제거.
+        _lastMarkersExpiry?.cancel();
+        _lastMarkersExpiry = null;
         _nearbyFriends = byUser.values.toList();
         _friendsRetryCount = 0;
         _friendsError = invalidRows ? '친구 좌표 응답 형식을 확인해야 합니다.' : null;
@@ -295,9 +343,20 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     if (generation != _friendsGeneration || !mounted) return;
     _stopFriendsConnection(resetRetry: false);
     setState(() {
-      _nearbyFriends.clear();
-      _friendsError = message ?? '친구 위치 연결이 끊겼습니다. 재연결 중…';
+      _friendsError = message ?? '연결 복구 중 · 마지막 위치 표시';
+      if (!retry) _nearbyFriends.clear();
     });
+    // 끊김 동안만 마지막 좌표 유지. 첫 실패부터 30초 후 오래된 핀 제거.
+    if (retry && _nearbyFriends.isNotEmpty && _lastMarkersExpiry == null) {
+      _lastMarkersExpiry = Timer(const Duration(seconds: 30), () {
+        _lastMarkersExpiry = null;
+        if (!mounted) return;
+        setState(() {
+          _nearbyFriends.clear();
+          _friendsError = '친구 위치 갱신을 기다리고 있어요.';
+        });
+      });
+    }
     if (!retry || !_shouldConnectFriends) return;
     final seconds = _friendsRetryCount < 4 ? 2 << _friendsRetryCount : 30;
     _friendsRetryCount++;
@@ -310,6 +369,11 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
   void _stopFriendsConnection({bool resetRetry = true}) {
     // 이미 닫힌 연결의 지연 콜백은 새 연결에 영향을 주지 않는다.
     _friendsGeneration++;
+    _friendsConnecting = false;
+    if (resetRetry) {
+      _lastMarkersExpiry?.cancel();
+      _lastMarkersExpiry = null;
+    }
     _nearbyRefreshTimer?.cancel();
     _nearbyRefreshTimer = null;
     _friendsRetryTimer?.cancel();
@@ -783,8 +847,11 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
                               child: KeyedSubtree(
                                 key: ValueKey(friend.userId),
                                 child: _buildDropPinMarker(
-                                  friend.name,
+                                  _friendPetNames[friend.userId] ?? friend.name,
                                   friend.profileImage,
+                                  friend.breed.isNotEmpty
+                                      ? friend.breed
+                                      : _friendBreeds[friend.userId] ?? '',
                                 ),
                               ),
                             );
@@ -1070,7 +1137,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     );
   }
 
-  Widget _buildDropPinMarker(String name, String? imageUrl) {
+  Widget _buildDropPinMarker(String name, String? imageUrl, String breed) {
     return CustomPaint(
       painter: PinDropShadowPainter(),
       child: Column(
@@ -1084,7 +1151,7 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
               color: Color(0xFF9EBA9F),
               shape: BoxShape.circle,
             ),
-            child: Center(child: _buildDogImage(imageUrl, name)),
+            child: Center(child: _buildDogImage(imageUrl, breed)),
           ),
           const SizedBox(height: 3),
           Text(
@@ -1101,45 +1168,70 @@ class _WalkTrackingScreenState extends State<WalkTrackingScreen>
     );
   }
 
-  Widget _buildDogImage(String? imageUrl, String name) {
-    if ((imageUrl == null || imageUrl.isEmpty) && !ApiService.useMockData) {
-      return const Icon(Icons.pets, size: 24, color: Color(0xFF3F6634));
-    }
-    final Map<String, String> nameMap = {
-      '초코': 'poodle.png',
-      '밀크': 'samoyed.png',
-      '토리': 'corgi.png',
-      '휴지': 'bichon.png',
+  Widget _buildDogImage(String? imageUrl, String breed) {
+    const breedFiles = {
+      '비글': 'beagle',
+      '비숑': 'bichon',
+      '치와와': 'chihuahua',
+      '웰시코기': 'corgi',
+      '닥스훈트': 'dachshund',
+      '도베르만': 'doberman',
+      '프렌치불독': 'french_bulldog',
+      '골든리트리버': 'golden_retriever',
+      '그레이하운드': 'greyhound',
+      '허스키': 'husky',
+      '말티즈': 'maltese',
+      '포메라니안': 'pomeranian',
+      '푸들': 'poodle',
+      '퍼그': 'pug',
+      '사모예드': 'samoyed',
+      '슈나우저': 'schnauzer',
     };
-
-    final fileName = nameMap[name] ?? 'maltese.png';
-
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      if (imageUrl.startsWith('http')) {
-        return ClipOval(
-          child: Image.network(
-            imageUrl,
-            width: 36,
-            height: 36,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Image.asset(
-              'assets/dogs/$fileName',
-              width: 36,
-              height: 36,
-              fit: BoxFit.contain,
-            ),
-          ),
-        );
+    final normalized = breed.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    String? fileName;
+    for (final entry in breedFiles.entries) {
+      if (normalized == entry.key ||
+          normalized.replaceAll('_', '') == entry.value.replaceAll('_', '')) {
+        fileName = entry.value;
+        break;
       }
     }
-    return Image.asset(
-      'assets/dogs/$fileName',
-      width: 36,
-      height: 36,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) =>
-          const Icon(Icons.pets, size: 24, color: Color(0xFF3F6634)),
-    );
+    Widget placeholder() =>
+        const Icon(Icons.pets, size: 24, color: Color(0xFF3F6634));
+    Widget breedImage() {
+      if (fileName == null) return placeholder();
+      return Image.asset(
+        'assets/dogs/$fileName.png',
+        width: 36,
+        height: 36,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => placeholder(),
+      );
+    }
+
+    if (imageUrl == null || imageUrl.isEmpty) return breedImage();
+    final uri = Uri.tryParse(imageUrl);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: 36,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => breedImage(),
+        ),
+      );
+    }
+    if (imageUrl.startsWith('assets/')) {
+      return Image.asset(
+        imageUrl,
+        width: 36,
+        height: 36,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => breedImage(),
+      );
+    }
+    return breedImage();
   }
 }
 

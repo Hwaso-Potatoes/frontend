@@ -530,13 +530,13 @@ class ApiService {
           .toList();
       final friendRows = (responses[3] as List<dynamic>);
       // 기존 명세에는 산책 상태가 없다. 아래 키는 백엔드 확인이 필요한
-      // 연동 계약: is_walking_now(boolean). 누락/잘못된 타입은 상태 미확인.
+      // 연동 계약: is_walking.
       final walkingFriendsStatusAvailable =
           !friendLookupFailed &&
-          friendRows.every((f) => f is Map && f['is_walking_now'] is bool);
+          friendRows.every((f) => f is Map && f['is_walking'] is bool);
       final friendList = <FriendDogDisplay>[];
       for (final row in friendRows) {
-        if (row is! Map || row['is_walking_now'] != true) continue;
+        if (row is! Map || row['is_walking'] != true) continue;
         final pets = row['pets'];
         final firstPet = pets is List && pets.isNotEmpty && pets.first is Map
             ? Map<String, dynamic>.from(pets.first as Map)
