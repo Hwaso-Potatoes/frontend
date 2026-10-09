@@ -66,6 +66,19 @@ class ReportComparisonChart extends StatelessWidget {
             ),
           ],
         ),
+        if (data.totalDistanceKm != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '총 ${data.totalDistanceKm!.toStringAsFixed(1)}km',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        if (data.current.isEmpty && data.previous.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('산책 기록이 없습니다.'),
+          ),
         const SizedBox(height: 28),
         SizedBox(
           height: 145,
@@ -76,6 +89,8 @@ class ReportComparisonChart extends StatelessWidget {
               data.previous,
               data.currentPointIndex,
               data.isDaily,
+              data.currentPositions,
+              data.previousPositions,
             ),
           ),
         ),
@@ -132,11 +147,14 @@ class _ComparisonPainter extends CustomPainter {
   final List<double> previous;
   final int pointIndex;
   final bool isDaily;
+  final List<double>? currentPositions, previousPositions;
   _ComparisonPainter(
     this.current,
     this.previous,
     this.pointIndex,
     this.isDaily,
+    this.currentPositions,
+    this.previousPositions,
   );
 
   @override
@@ -146,7 +164,12 @@ class _ComparisonPainter extends CustomPainter {
       ...previous,
     ].fold<double>(0, (a, b) => a > b ? a : b);
     Offset position(List<double> series, int i) => Offset(
-      5 + (size.width - 10) * i / (previous.length - 1),
+      5 +
+          (size.width - 10) *
+              ((identical(series, current)
+                      ? currentPositions
+                      : previousPositions)?[i] ??
+                  (series.length <= 1 ? 0.5 : i / (series.length - 1))),
       size.height -
           5 -
           series[i] /
@@ -158,7 +181,10 @@ class _ComparisonPainter extends CustomPainter {
       final path = Path();
       for (
         int i = 0;
-        i < (identical(series, current) ? pointIndex + 1 : series.length);
+        i <
+            (identical(series, current)
+                ? (pointIndex + 1).clamp(0, series.length)
+                : series.length);
         i++
       ) {
         final p = position(series, i);
@@ -176,15 +202,17 @@ class _ComparisonPainter extends CustomPainter {
       ..lineTo(size.width - 5, size.height)
       ..lineTo(5, size.height)
       ..close();
-    canvas.drawPath(
-      area,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFE0E0E0), Color(0x00FFFFFF)],
-        ).createShader(Offset.zero & size),
-    );
+    if (previous.isNotEmpty) {
+      canvas.drawPath(
+        area,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE0E0E0), Color(0x00FFFFFF)],
+          ).createShader(Offset.zero & size),
+      );
+    }
     canvas.drawPath(
       greyLine,
       Paint()
@@ -201,16 +229,20 @@ class _ComparisonPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round
         ..strokeCap = StrokeCap.round,
     );
-    canvas.drawCircle(
-      position(current, pointIndex),
-      6,
-      Paint()..color = const Color(0xFF72AA4F),
-    );
+    if (current.isNotEmpty && pointIndex >= 0 && pointIndex < current.length) {
+      canvas.drawCircle(
+        position(current, pointIndex),
+        6,
+        Paint()..color = const Color(0xFF72AA4F),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant _ComparisonPainter oldDelegate) =>
       oldDelegate.current != current ||
       oldDelegate.previous != previous ||
-      oldDelegate.pointIndex != pointIndex;
+      oldDelegate.pointIndex != pointIndex ||
+      oldDelegate.currentPositions != currentPositions ||
+      oldDelegate.previousPositions != previousPositions;
 }
