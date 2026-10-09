@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import 'decorate_screen.dart';
 import 'accessory_box_screen.dart' as attendance_box;
+import '../widgets/reward_accessory_image.dart';
 
 const Color backgroundColor = Color(0xFFF8F9E5);
 const Color primaryGreen = Color(0xFF496B31);
@@ -130,43 +131,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  Widget _rewardThumbnail(AttendanceRewardItem reward) {
-    final accessory = reward.accessory;
-    final image = ApiService.resolveMediaUrl(accessory?.image);
-    Widget fallback() => StickerIconWidget(
-      name: accessory?.name ?? '',
-      category: accessory?.category,
-      size: 52,
-    );
-    if (image == null || image.isEmpty) {
-      // image가 없으면 네트워크 요청도 없으므로 HTTP 오류가 발생하지 않는다.
-      debugPrint('[출석 보상 ${reward.id}] 이미지 경로 없음 또는 지원하지 않는 형식: 기존 아이콘 표시');
-      return fallback();
-    }
-    Widget onImageError(Object error) {
-      // 이미지 위젯의 비동기 오류는 목록 API의 catch로 전달되지 않는다.
-      debugPrint(
-        '[출석 보상 ${reward.id}] 이미지 로딩 실패 (${error.runtimeType}): 기존 아이콘 표시',
-      );
-      return fallback();
-    }
-
-    return SizedBox(
-      width: 52,
-      height: 52,
-      child: image.startsWith('assets/')
-          ? Image.asset(
-              image,
-              fit: BoxFit.contain,
-              errorBuilder: (_, error, ___) => onImageError(error),
-            )
-          : Image.network(
-              image,
-              fit: BoxFit.contain,
-              errorBuilder: (_, error, ___) => onImageError(error),
-            ),
-    );
-  }
+  Widget _rewardThumbnail(AttendanceRewardItem reward) => RewardAccessoryImage(
+    accessoryId: reward.accessory?.id,
+    serverImage: reward.accessory?.image,
+    size: 52,
+  );
 
   // 달력 팝업창 띄우기 (GET api/attendance/calendar/?year=year&month=month 연동)
   void _showCalendarDialog([int? year, int? month]) {
@@ -553,9 +522,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           else
             ..._rewards.map((reward) {
               final name = reward.accessory?.name.trim();
-              final label = name == null || name.isEmpty
-                  ? '액세서리 정보 확인 중'
-                  : name;
+              final label = rewardAccessoryDisplayName(
+                reward.accessory?.id,
+                name,
+              );
               final dayText = _formatDayText(reward.attendanceDate);
 
               return Column(
@@ -563,7 +533,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   InkWell(
                     onTap: reward.accessory == null
                         ? null
-                        : () => _navigateToDecorateScreen(label),
+                        : () => _navigateToDecorateScreen(name),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -617,176 +587,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 // -----------------------------------------------------------------------------
 // [스티커 아이콘 위젯 (넥타이 케이프, 하트 핀, 왕관 벡터 스티커)]
 // -----------------------------------------------------------------------------
-class StickerIconWidget extends StatelessWidget {
-  final String name;
-  final String? category;
-  final double size;
-
-  const StickerIconWidget({
-    super.key,
-    required this.name,
-    this.category,
-    this.size = 52,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F5ED),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Center(
-        child: SizedBox(
-          width: size * 0.55,
-          height: size * 0.55,
-          child: _buildStickerGraphic(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStickerGraphic() {
-    final normalizedCategory = category?.trim().toUpperCase();
-    if (name.contains('넥타이') ||
-        name.contains('케이프') ||
-        normalizedCategory == 'CAPE') {
-      return CustomPaint(painter: TieCapeStickerPainter());
-    } else if (name.contains('하트') ||
-        name.contains('핀') ||
-        name.contains('헤어') ||
-        normalizedCategory == 'PIN' ||
-        normalizedCategory == 'HAIR') {
-      return CustomPaint(painter: HeartPinStickerPainter());
-    } else if (name.contains('왕관') || normalizedCategory == 'CROWN') {
-      return CustomPaint(painter: CrownStickerPainter());
-    }
-    return const Icon(
-      Icons.image_not_supported_outlined,
-      color: Color(0xFF636037),
-      size: 28,
-    );
-  }
-}
-
-class TieCapeStickerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final collarPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final tiePaint = Paint()
-      ..color = const Color(0xFF2B2B2B)
-      ..style = PaintingStyle.fill;
-
-    final outlinePaint = Paint()
-      ..color = const Color(0xFF1E1E1E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final double w = size.width;
-    final double h = size.height;
-
-    final collarPath = Path();
-    collarPath.moveTo(w * 0.1, h * 0.35);
-    collarPath.quadraticBezierTo(w * 0.45, h * 0.15, w * 0.85, h * 0.25);
-    collarPath.lineTo(w * 0.75, h * 0.6);
-    collarPath.quadraticBezierTo(w * 0.45, h * 0.5, w * 0.2, h * 0.65);
-    collarPath.close();
-
-    canvas.drawPath(collarPath, collarPaint);
-    canvas.drawPath(collarPath, outlinePaint);
-
-    final tiePath = Path();
-    tiePath.moveTo(w * 0.38, h * 0.45);
-    tiePath.lineTo(w * 0.52, h * 0.48);
-    tiePath.lineTo(w * 0.62, h * 0.82);
-    tiePath.lineTo(w * 0.48, h * 0.95);
-    tiePath.lineTo(w * 0.35, h * 0.78);
-    tiePath.close();
-
-    canvas.drawPath(tiePath, tiePaint);
-    canvas.drawPath(tiePath, outlinePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class HeartPinStickerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final heartPaint = Paint()
-      ..color = const Color(0xFFC7432B)
-      ..style = PaintingStyle.fill;
-
-    final outlinePaint = Paint()
-      ..color = const Color(0xFF1A1A1A)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final double w = size.width;
-    final double h = size.height;
-
-    final path = Path();
-    path.moveTo(w * 0.5, h * 0.85);
-    path.cubicTo(w * 0.1, h * 0.55, 0, h * 0.25, w * 0.3, h * 0.15);
-    path.cubicTo(w * 0.45, h * 0.1, w * 0.5, h * 0.3, w * 0.5, h * 0.3);
-    path.cubicTo(w * 0.5, h * 0.3, w * 0.55, h * 0.1, w * 0.7, h * 0.15);
-    path.cubicTo(w, h * 0.25, w * 0.9, h * 0.55, w * 0.5, h * 0.85);
-    path.close();
-
-    canvas.drawPath(path, heartPaint);
-    canvas.drawPath(path, outlinePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class CrownStickerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final crownPaint = Paint()
-      ..color = const Color(0xFFE5B537)
-      ..style = PaintingStyle.fill;
-
-    final outlinePaint = Paint()
-      ..color = const Color(0xFF1E1E1E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final double w = size.width;
-    final double h = size.height;
-
-    final path = Path();
-    path.moveTo(w * 0.15, h * 0.8);
-    path.lineTo(w * 0.05, h * 0.35);
-    path.lineTo(w * 0.3, h * 0.52);
-    path.lineTo(w * 0.5, h * 0.25);
-    path.lineTo(w * 0.7, h * 0.52);
-    path.lineTo(w * 0.95, h * 0.35);
-    path.lineTo(w * 0.85, h * 0.8);
-    path.close();
-
-    canvas.drawPath(path, crownPaint);
-    canvas.drawPath(path, outlinePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// 4. 전체보기 모달 달력 위젯 (GET api/attendance/calendar/?year=year&month=month)
 class CalendarDialog extends StatefulWidget {
   final int year;
   final int month;
