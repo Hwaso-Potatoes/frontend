@@ -5,7 +5,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:walk_guide_frontend/models/friend_model.dart';
+import 'package:walk_guide_frontend/models/active_pet_model.dart';
+import 'package:walk_guide_frontend/services/active_pet_store.dart';
 import 'package:walk_guide_frontend/screens/report_screen.dart';
+import 'package:walk_guide_frontend/screens/badge_book_screen.dart';
+import 'package:walk_guide_frontend/models/badge_model.dart';
 import 'package:walk_guide_frontend/screens/friend_screen.dart';
 import 'package:walk_guide_frontend/widgets/custom_widgets.dart';
 import 'package:walk_guide_frontend/widgets/decoration/dog_character.dart';
@@ -92,7 +96,71 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(harness(const ReportScreen(), 1));
+    final store = ActivePetStore()
+      ..pet = ActivePet.fromJson({'id': 1, 'name': '두부', 'breed': '비숑'});
+    Future<dynamic> request(
+      String method,
+      String path, {
+      Map<String, dynamic>? body,
+    }) async {
+      if (path == '/api/attendance/summary/')
+        return {'current_streak': 5, 'best_streak': 9};
+      final query = Uri.parse(path).queryParameters;
+      final period = query['period']!;
+      final labels = period == 'DAY'
+          ? ['아침', '점심', '오후', '저녁']
+          : period == 'MONTH'
+          ? ['1주', '2주', '3주', '4주']
+          : ['7월', '8월', '9월', '10월'];
+      final peak = period == 'DAY'
+          ? '저녁'
+          : period == 'MONTH'
+          ? '3주'
+          : '10월';
+      return {
+        'period': period,
+        'date': query['date'],
+        'start_date': query['date'],
+        'end_date': query['date'],
+        'comparison': {
+          'current_distance_km': 3.0,
+          'baseline_distance_km': 2.0,
+          'difference_km': 1.0,
+          'baseline_type': period == 'DAY'
+              ? 'RECENT_AVERAGE'
+              : period == 'MONTH'
+              ? 'PREVIOUS_MONTH'
+              : 'PREVIOUS_YEAR',
+        },
+        'trend': {
+          'current': [
+            {'key': 0, 'label': '시작', 'distance_km': 0.0},
+            {'key': 1, 'label': '끝', 'distance_km': 3.0},
+          ],
+          'comparison': [
+            {'key': 0, 'label': '시작', 'distance_km': 1.0},
+            {'key': 1, 'label': '끝', 'distance_km': 2.0},
+          ],
+        },
+        'highlight': {
+          'top_label': peak,
+          'top_distance_km': 1.8,
+          'items': labels
+              .map(
+                (label) => {
+                  'key': label,
+                  'label': label,
+                  'distance_km': label == peak ? 1.8 : 0.4,
+                },
+              )
+              .toList(),
+        },
+      };
+    }
+
+    await tester.pumpWidget(
+      harness(ReportScreen(store: store, request: request), 1),
+    );
     await tester.pumpAndSettle();
     expect(find.text('하루'), findsOneWidget);
     expect(find.text('저녁'), findsOneWidget);
@@ -107,10 +175,10 @@ void main() {
     await capture(tester, 'report-year');
     await tester.tap(find.byTooltip('이전 기간'));
     await tester.pumpAndSettle();
-    expect(find.text('${DateTime.now().year - 1}'), findsOneWidget);
+    expect(find.text('${DateTime.now().year - 1}년'), findsOneWidget);
     await tester.tap(find.byTooltip('다음 기간'));
     await tester.pumpAndSettle();
-    expect(find.text('${DateTime.now().year}'), findsOneWidget);
+    expect(find.text('${DateTime.now().year}년'), findsOneWidget);
     expect(tester.takeException(), isNull);
     tester.view.physicalSize = const Size(320, 640);
     await tester.pumpAndSettle();
@@ -143,6 +211,71 @@ void main() {
     }
     debugDisableShadows = true;
   });
+  testWidgets(
+    'Badge book renders server ownership, details and retry at narrow widths',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = ActivePetStore()
+        ..pet = ActivePet.fromJson({'id': 1, 'name': '두부', 'breed': '비숑'});
+      var fail = false;
+      Future<List<BadgeModel>> loader(int id) async {
+        if (fail) throw StateError('offline');
+        return List.generate(
+          19,
+          (i) => BadgeModel(
+            id: i + 1,
+            name: i == 0
+                ? '첫 친구'
+                : i == 1
+                ? '진화의 달인'
+                : '뱃지 ${i + 1}',
+            description: i == 0 ? '처음 친구 추가시 획득' : '서버 획득 조건',
+            isOwned: {1, 5, 13}.contains(i + 1),
+            acquiredAt: {1, 5, 13}.contains(i + 1)
+                ? DateTime.utc(2026, 10, 9, 1)
+                : null,
+          ),
+        );
+      }
+
+      await tester.pumpWidget(
+        harness(BadgeBookScreen(store: store, loader: loader), 4),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3 / 19 보유'), findsOneWidget);
+      await capture(tester, 'badge-book');
+      await tester.tap(find.byType(GestureDetector).at(1));
+      await tester.pumpAndSettle();
+      expect(find.text('첫 친구'), findsOneWidget);
+      await capture(tester, 'badge-owned');
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(GestureDetector).at(2));
+      await tester.pumpAndSettle();
+      expect(find.text('진화의 달인'), findsOneWidget);
+      await capture(tester, 'badge-unowned');
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(320, 640);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      fail = true;
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, 400),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('다시 조회'), findsOneWidget);
+      fail = false;
+      await tester.tap(find.text('다시 조회'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 / 19 보유'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('Friend detail, cancel, deletion, re-fetch and preview refresh', (
     tester,
   ) async {

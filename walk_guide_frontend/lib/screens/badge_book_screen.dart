@@ -1,24 +1,20 @@
-// =============================================================================
-// TODO (백엔드 팀에게 요청 필요) — badge_model.dart 상단 TODO 참고
-// - 전체 뱃지 마스터 목록 API 없음 → 지금은 BadgeModel.dummyMasterList() 사용
-// - description(획득 조건 문구), location(획득 위치) 필드 없음 → 지금은
-//   더미 텍스트 / 빈 값으로 처리, API 나오면 owned 병합 로직에서 교체 예정
-// - "보유 뱃지 조회" API 연동 지점은 이 파일의 _loadBadges()에 표시해둠
-// =============================================================================
-
 import 'package:flutter/material.dart';
 import '../models/badge_model.dart';
+import '../services/active_pet_store.dart';
+import '../services/badge_book_service.dart';
+import '../services/api_service.dart';
 import '../widgets/icons/badge_icon.dart';
 
 const _kBgColor = Color(0xFFF8F9E5);
 const _kOliveText = Color(0xFF636037);
 const _kNeutralGrayKhaki = Color(0xFFA9AA80);
-const _kModalBg = Color(0xFFECEDD6);
 const _kCloseIconColor = Color(0xFF817F5A);
 const _kAccentGreen = Color(0xFF27722F);
 
 class BadgeBookScreen extends StatefulWidget {
-  const BadgeBookScreen({super.key});
+  final ActivePetStore? store;
+  final Future<List<BadgeModel>> Function(int)? loader;
+  const BadgeBookScreen({super.key, this.store, this.loader});
 
   @override
   State<BadgeBookScreen> createState() => _BadgeBookScreenState();
@@ -27,6 +23,8 @@ class BadgeBookScreen extends StatefulWidget {
 class _BadgeBookScreenState extends State<BadgeBookScreen> {
   List<BadgeModel> _badges = [];
   bool _isLoading = true;
+  String? _error;
+  int _request = 0;
 
   @override
   void initState() {
@@ -35,32 +33,35 @@ class _BadgeBookScreenState extends State<BadgeBookScreen> {
   }
 
   Future<void> _loadBadges() async {
-    // TODO(백엔드 연동): 실제로는 아래 두 가지를 합쳐야 함
-    //   1) 전체 뱃지 마스터 목록 (없음 → dummyMasterList로 대체 중)
-    //   2) GET /badges/owned/ 같은 "보유 뱃지 조회" API
-    //      응답 예: [{ "badge": {id,name,image}, "acquired_at": "..." }]
-    //      → List<BadgeModel> owned = response.map(BadgeModel.fromOwnedJson)
-    // 지금은 화면 먼저 완성하려고 마스터 목록 중 1/5/13번째만
-    // 보유(owned)한 것처럼 더미로 표시함.
-    final master = BadgeModel.dummyMasterList();
-    final ownedIds = {1, 5, 13}; // TODO: 실제 보유 뱃지 API 응답으로 교체
-
+    final request = ++_request;
     setState(() {
-      _badges = master
-          .map(
-            (b) => ownedIds.contains(b.id)
-                ? b.copyWith(isOwned: true, acquiredAt: DateTime.now())
-                : b,
-          )
-          .toList();
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      final state = widget.store ?? ActivePetStore.instance;
+      await state.ensureLoaded();
+      final petId = state.pet?.id;
+      if (petId == null) throw StateError('대표 반려견 정보를 조회하지 못했습니다.');
+      final badges = await (widget.loader ?? BadgeBookService.load)(petId);
+      if (!mounted || request != _request) return;
+      setState(() => _badges = badges);
+    } catch (e) {
+      if (!mounted || request != _request) return;
+      setState(
+        () => _error = e is ApiException
+            ? e.message
+            : '뱃지 정보를 불러오지 못했습니다. 다시 시도해주세요.',
+      );
+    } finally {
+      if (mounted && request == _request) setState(() => _isLoading = false);
+    }
   }
 
   void _openBadgeModal(BadgeModel badge) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (context) => _BadgeDetailModal(badge: badge),
     );
   }
@@ -74,6 +75,19 @@ class _BadgeBookScreenState extends State<BadgeBookScreen> {
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    TextButton(
+                      onPressed: _loadBadges,
+                      child: const Text('다시 조회'),
+                    ),
+                  ],
+                ),
+              )
             : Padding(
                 padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
                 child: Column(
@@ -112,17 +126,26 @@ class _BadgeBookScreenState extends State<BadgeBookScreen> {
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                             height: 1.0,
-                            color: _kOliveText.withOpacity(0.5),
+                            color: _kOliveText.withValues(alpha: 0.5),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     Expanded(
-                      child: SingleChildScrollView(
-                        child: _BadgeGrid(
-                          badges: _badges,
-                          onTap: _openBadgeModal,
+                      child: RefreshIndicator(
+                        onRefresh: _loadBadges,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: _badges.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text('등록된 뱃지가 없습니다.'),
+                                )
+                              : _BadgeGrid(
+                                  badges: _badges,
+                                  onTap: _openBadgeModal,
+                                ),
                         ),
                       ),
                     ),
@@ -145,7 +168,6 @@ class _BadgeGrid extends StatelessWidget {
   const _BadgeGrid({required this.badges, required this.onTap});
 
   static const _cellSize = 72.0;
-  static const _hSpacing = 19.0;
   static const _colCount = 4;
 
   @override
@@ -166,14 +188,29 @@ class _BadgeGrid extends StatelessWidget {
           Row(
             children: [
               for (var c = 0; c < rows[r].length; c++) ...[
-                if (c != 0) const SizedBox(width: _hSpacing),
-                _BadgeCell(badge: rows[r][c], onTap: () => onTap(rows[r][c])),
+                if (c != 0) const SizedBox(width: 12),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: _BadgeCell(
+                      badge: rows[r][c],
+                      onTap: () => onTap(rows[r][c]),
+                    ),
+                  ),
+                ),
+              ],
+              for (var c = rows[r].length; c < _colCount; c++) ...[
+                const SizedBox(width: 12),
+                const Expanded(child: SizedBox()),
               ],
             ],
           ),
           if (r != rows.length - 1) ...[
             const SizedBox(height: 20),
-            Container(height: 1, color: _kNeutralGrayKhaki.withOpacity(0.5)),
+            Container(
+              height: 1,
+              color: _kNeutralGrayKhaki.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 29),
           ],
         ],
@@ -197,8 +234,8 @@ class _BadgeCell extends StatelessWidget {
         height: _BadgeGrid._cellSize,
         decoration: BoxDecoration(
           color: badge.isOwned
-              ? _kAccentGreen.withOpacity(0.12)
-              : _kNeutralGrayKhaki.withOpacity(0.15),
+              ? _kAccentGreen.withValues(alpha: 0.12)
+              : _kNeutralGrayKhaki.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(15),
           border: badge.isOwned
               ? Border.all(color: _kAccentGreen, width: 2)
@@ -250,7 +287,7 @@ class _BadgeDetailModal extends StatelessWidget {
   const _BadgeDetailModal({required this.badge});
 
   String _formatAcquiredAt() {
-    final d = badge.acquiredAt;
+    final d = badge.acquiredAt?.toLocal();
     if (d == null) return '';
     return '${d.year}.${d.month.toString().padLeft(2, '0')}.'
         '${d.day.toString().padLeft(2, '0')} '
@@ -273,7 +310,7 @@ class _BadgeDetailModal extends StatelessWidget {
         width: 332,
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
         decoration: BoxDecoration(
-          color: _kModalBg,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(25),
         ),
         child: Column(
@@ -336,7 +373,10 @@ class _BadgeDetailModal extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 16),
-            Container(height: 1, color: _kNeutralGrayKhaki.withOpacity(0.5)),
+            Container(
+              height: 1,
+              color: _kNeutralGrayKhaki.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +397,7 @@ class _BadgeDetailModal extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        // TODO: description 백엔드 필드 없음 → 더미 문구 표시 중
+                        // Server-provided acquisition condition.
                         badge.description ?? '',
                         style: const TextStyle(
                           fontFamily: 'Inter',
@@ -379,7 +419,7 @@ class _BadgeDetailModal extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       fontSize: 10,
                       height: 1.0,
-                      color: _kOliveText.withOpacity(0.65),
+                      color: _kOliveText.withValues(alpha: 0.65),
                     ),
                   ),
               ],

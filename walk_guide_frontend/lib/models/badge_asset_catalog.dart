@@ -1,23 +1,22 @@
-/// Confirmed IDs in the user's numbered design reference.
-/// Null assets await original PNGs; never substitute a different badge image.
+/// Server badge IDs from the confirmed design reference.
 const badgeAssetCatalog = <int, String?>{
-  1: 'assets/images/badge1.png', // First friend
-  2: null, // Level 50
-  3: null, // Rain
-  4: null, // Snow
-  5: 'assets/images/badge3.png', // 60 minutes
-  6: null, // 5 hours
-  7: null, // 10 hours
-  8: null, // 50 hours
-  9: null, // 5 km
-  10: null, // 10 km
-  11: null, // 30 km
-  12: null, // 50 km
-  13: 'assets/images/badge2.png', // First walk
-  14: null, // 30 consecutive days
-  15: null, // 3 walks in one day
-  16: null, // 7 consecutive days
-  17: null, // New area
-  18: null, // Forest
-  19: null, // City
+  1: 'assets/badge/처음 친구 추가시 획득.png',
+  2: 'assets/badge/Lv.50 진화 완료시 획득.png',
+  3: 'assets/badge/비오는날 산책시 획득.png',
+  4: 'assets/badge/눈오는날 산책.png',
+  5: 'assets/badge/산책 1시간.png',
+  6: 'assets/badge/산책 5시간.png',
+  7: 'assets/badge/산책 10시간.png',
+  8: 'assets/badge/산책 50시간.png',
+  9: 'assets/badge/산책 5km.png',
+  10: 'assets/badge/산책 10km.png',
+  11: 'assets/badge/산책 30km.png',
+  12: 'assets/badge/산책 50km.png',
+  13: 'assets/badge/첫 산책.png',
+  14: 'assets/badge/한달 연속 출석.png',
+  15: 'assets/badge/하루 3회 산책.png',
+  16: 'assets/badge/일주일 연속 출석.png',
+  17: 'assets/badge/새로운 지역 산책.png',
+  18: 'assets/badge/숲길 탐험가.png',
+  19: 'assets/badge/도시 여행자.png',
 };

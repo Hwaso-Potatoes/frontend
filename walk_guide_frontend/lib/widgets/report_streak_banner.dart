@@ -34,7 +34,9 @@ class ReportStreakBanner extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$dogName와 $days일 연속 산책중!',
+                days == 0
+                    ? '$dogName의 연속 산책을 시작해보세요!'
+                    : '$dogName와 $days일 연속 산책중!',
                 style: const TextStyle(
                   fontSize: 15,
                   color: Color(0xFF27722F),
@@ -42,7 +44,9 @@ class ReportStreakBanner extends StatelessWidget {
                 ),
               ),
               Text(
-                '최장 기록 $recordDays일 까지 ${recordDays - days}일 남았어요.',
+                days >= recordDays && days > 0
+                    ? '최장 기록 ${days > recordDays ? days : recordDays}일을 이어가고 있어요.'
+                    : '최장 기록 $recordDays일까지 ${(recordDays - days).clamp(0, recordDays)}일 남았어요.',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF85845F)),
               ),
             ],

@@ -201,11 +201,15 @@ final Map<ReportPeriod, ReportData> dummyReportData = {
 /// data above is preserved for other callers. These values are not API totals.
 class ReportComparisonData {
   final String periodLabel, comparisonPrefix, differenceLabel, comparisonSuffix;
-  final String currentLegend, previousLegend, chartContext, peakLabel;
+  final String currentLegend, previousLegend, chartContext;
+  final String? peakLabel;
   final List<double> current, previous;
   final List<String> axisLabels;
   final List<ChartBarEntry> bars;
   final int currentPointIndex;
+  final List<double>? currentPositions, previousPositions;
+  final String? serverPeakDistance;
+  final double? totalDistanceKm;
   final bool isDaily;
   final int streakDays, recordDays;
   const ReportComparisonData({
@@ -219,6 +223,10 @@ class ReportComparisonData {
     required this.previous,
     required this.axisLabels,
     required this.currentPointIndex,
+    this.currentPositions,
+    this.previousPositions,
+    this.serverPeakDistance,
+    this.totalDistanceKm,
     required this.chartContext,
     required this.peakLabel,
     required this.bars,
@@ -227,7 +235,8 @@ class ReportComparisonData {
     this.recordDays = 9,
   });
   String get peakDistance =>
-      '${bars.map((b) => b.value).reduce((a, b) => a > b ? a : b).toStringAsFixed(1)}km';
+      serverPeakDistance ??
+      '${bars.fold<double>(0, (a, b) => a > b.value ? a : b.value).toStringAsFixed(1)}km';
 }
 
 ReportComparisonData mockComparisonReport(
