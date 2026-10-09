@@ -35,8 +35,8 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
   Timer? _countdownTimer;
 
   // 내 반려견 정보
-  String _petName = '두부';
-  String _petBreed = '말티즈';
+  String _petName = '반려견';
+  String _petBreed = '견종';
   int _petLevel = 1;
   String? _petImageUrl;
 
@@ -81,7 +81,9 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
           _petName = pet['name']?.toString() ?? '반려견';
           _petBreed = pet['breed']?.toString() ?? '견종';
           _petLevel = pet['level'] is int ? pet['level'] : 1;
-          _petImageUrl = pet['profile_image']?.toString();
+          _petImageUrl = ApiService.resolveMediaUrl(
+            pet['profile_image']?.toString(),
+          );
         });
       }
     } catch (_) {}
@@ -166,10 +168,7 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
 
       final msg = e is ApiException ? e.message : '친구 등록 실패: $e';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -342,23 +341,31 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: Colors.redAccent, size: 40),
+                            const Icon(
+                              Icons.error_outline,
+                              color: Colors.redAccent,
+                              size: 40,
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               _qrErrorMessage!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
-                                  color: Colors.black54, fontSize: 13),
+                                color: Colors.black54,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: _loadMyQr,
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryGreen),
-                              child: const Text('다시 시도',
-                                  style: TextStyle(color: Colors.white)),
-                            )
+                                backgroundColor: primaryGreen,
+                              ),
+                              child: const Text(
+                                '다시 시도',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                           ],
                         ),
                       )
@@ -368,25 +375,35 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.timer_off_outlined,
-                                color: Colors.orange, size: 48),
+                            const Icon(
+                              Icons.timer_off_outlined,
+                              color: Colors.orange,
+                              size: 48,
+                            ),
                             const SizedBox(height: 10),
                             const Text(
                               'QR 코드가 만료되었습니다.',
                               style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: _loadMyQr,
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryGreen),
-                              icon: const Icon(Icons.refresh,
-                                  color: Colors.white, size: 18),
-                              label: const Text('새 QR 생성하기',
-                                  style: TextStyle(color: Colors.white)),
-                            )
+                                backgroundColor: primaryGreen,
+                              ),
+                              icon: const Icon(
+                                Icons.refresh,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                '새 QR 생성하기',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                           ],
                         ),
                       )
@@ -421,8 +438,11 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 16, color: primaryGreen),
+                          const Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: primaryGreen,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '유효시간 ${_formatRemainingTime(_remainingSeconds)}',
@@ -472,25 +492,7 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                 child: ClipOval(
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: _petImageUrl != null && _petImageUrl!.isNotEmpty
-                        ? Image.network(
-                            _petImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Image.asset(
-                              'assets/dogs/samoyed.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (c, e, s) => const Icon(Icons.pets,
-                                  size: 40, color: Colors.white),
-                            ),
-                          )
-                        : Image.asset(
-                            'assets/dogs/samoyed.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.pets,
-                                    size: 40, color: Colors.white),
-                          ),
+                    child: _buildPetImage(),
                   ),
                 ),
               ),
@@ -504,6 +506,60 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
   // ---------------------------------------------------------------------------
   // [스캔 카메라 뷰]
   // ---------------------------------------------------------------------------
+  Widget _buildPetImage() {
+    Widget breedImage() {
+      const breeds = <String, String>{
+        '비글': 'beagle',
+        '비숑': 'bichon',
+        '치와와': 'chihuahua',
+        '웰시코기': 'corgi',
+        '닥스훈트': 'dachshund',
+        '도베르만': 'doberman',
+        '프렌치불독': 'french_bulldog',
+        '골든리트리버': 'golden_retriever',
+        '그레이하운드': 'greyhound',
+        '허스키': 'husky',
+        '말티즈': 'maltese',
+        '포메라니안': 'pomeranian',
+        '푸들': 'poodle',
+        '퍼그': 'pug',
+        '사모예드': 'samoyed',
+        '슈나우저': 'schnauzer',
+      };
+      final normalized = _petBreed.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      String? file;
+      for (final entry in breeds.entries) {
+        if (normalized.contains(entry.key) ||
+            normalized == entry.value.replaceAll('_', '')) {
+          file = entry.value;
+          break;
+        }
+      }
+      if (file == null)
+        return const Icon(Icons.pets, size: 40, color: Colors.white);
+      return Image.asset(
+        'assets/dogs/$file.png',
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.pets, size: 40, color: Colors.white),
+      );
+    }
+
+    final image = _petImageUrl;
+    if (image == null || image.isEmpty) return breedImage();
+    return image.startsWith('assets/')
+        ? Image.asset(
+            image,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => breedImage(),
+          )
+        : Image.network(
+            image,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => breedImage(),
+          );
+  }
+
   Widget _buildScanView() {
     return Center(
       key: const ValueKey('scanView'),
@@ -539,23 +595,31 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.videocam_off_outlined,
-                                color: Colors.white70, size: 54),
+                            const Icon(
+                              Icons.videocam_off_outlined,
+                              color: Colors.white70,
+                              size: 54,
+                            ),
                             const SizedBox(height: 12),
                             const Text(
                               '카메라를 실행할 수 없습니다.\n(권한 확인 또는 웹 브라우저 지원 여부)',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                  color: Colors.white70, fontSize: 13),
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: _showManualInputDialog,
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryGreen),
-                              child: const Text('토큰 직접 입력하기',
-                                  style: TextStyle(color: Colors.white)),
-                            )
+                                backgroundColor: primaryGreen,
+                              ),
+                              child: const Text(
+                                '토큰 직접 입력하기',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -622,16 +686,20 @@ class _QrFriendAddScreenState extends State<QrFriendAddScreen> {
                             Text(
                               '친구 등록 중...',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         )
                       else
                         TextButton.icon(
                           onPressed: _showManualInputDialog,
-                          icon: const Icon(Icons.keyboard,
-                              color: Colors.white70, size: 18),
+                          icon: const Icon(
+                            Icons.keyboard,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
                           label: const Text(
                             '토큰 직접 입력하기',
                             style: TextStyle(

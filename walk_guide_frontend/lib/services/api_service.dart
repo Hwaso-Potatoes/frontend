@@ -42,11 +42,13 @@ class PetMissionItem {
 class FriendDogDisplay {
   final String name;
   final String? profileImage;
+  final String breed;
   final double? distanceMeters;
 
   FriendDogDisplay({
     required this.name,
     this.profileImage,
+    this.breed = '',
     this.distanceMeters,
   });
 }
@@ -63,6 +65,7 @@ class HomeDashboardResponse {
   final double targetDistance;
   final double currentDistance;
   final List<FriendDogDisplay> walkingFriends;
+  final bool walkingFriendsStatusAvailable;
   final List<PetMissionItem> dailyMissions;
 
   HomeDashboardResponse({
@@ -77,6 +80,7 @@ class HomeDashboardResponse {
     required this.targetDistance,
     required this.currentDistance,
     required this.walkingFriends,
+    this.walkingFriendsStatusAvailable = true,
     required this.dailyMissions,
   });
 }
@@ -451,12 +455,8 @@ class ApiService {
         petPersonalities: ['에너지형', '호기심형'],
         targetDistance: 2.0,
         currentDistance: 1.4,
-        walkingFriends: [
-          FriendDogDisplay(name: '초코'),
-          FriendDogDisplay(name: '밀크'),
-          FriendDogDisplay(name: '토리'),
-          FriendDogDisplay(name: '휴지'),
-        ],
+        walkingFriends: const [],
+        walkingFriendsStatusAvailable: false,
         dailyMissions: [
           PetMissionItem(
             id: 101,
@@ -496,6 +496,7 @@ class ApiService {
         throw ApiException(404, '등록된 반려견을 찾을 수 없습니다.');
       }
 
+      var friendLookupFailed = false;
       // 부가 정보는 응답을 기다리고, 조회 실패 시 빈 목록을 사용한다.
       Future<List<dynamic>> optionalList(String path, String label) async {
         try {
@@ -503,8 +504,10 @@ class ApiService {
           return _asList(body);
         } on ApiException catch (e) {
           if (e.isUnauthorized) rethrow;
+          if (path == '/api/friends/') friendLookupFailed = true;
           return const [];
         } catch (_) {
+          if (path == '/api/friends/') friendLookupFailed = true;
           return const [];
         }
       }
@@ -525,23 +528,30 @@ class ApiService {
           .whereType<Map<String, dynamic>>()
           .map(PetMissionItem.fromJson)
           .toList();
-      final friendList = (responses[3] as List<dynamic>).whereType<Map>().map((
-        f,
-      ) {
-        // GET api/friends/ 응답: { id, nickname, pets: [{ id, name, breed }] }
-        final pets = f['pets'];
-        final firstPet = (pets is List && pets.isNotEmpty) ? pets.first : null;
-        return FriendDogDisplay(
-          name:
-              firstPet?['name']?.toString() ??
-              f['pet_name']?.toString() ??
-              f['nickname']?.toString() ??
-              '친구',
-          profileImage: resolveMediaUrl(
-            (firstPet?['profile_image'] ?? f['profile_image_url'])?.toString(),
+      final friendRows = (responses[3] as List<dynamic>);
+      // 기존 명세에는 산책 상태가 없다. 아래 키는 백엔드 확인이 필요한
+      // 연동 계약: is_walking_now(boolean). 누락/잘못된 타입은 상태 미확인.
+      final walkingFriendsStatusAvailable =
+          !friendLookupFailed &&
+          friendRows.every((f) => f is Map && f['is_walking_now'] is bool);
+      final friendList = <FriendDogDisplay>[];
+      for (final row in friendRows) {
+        if (row is! Map || row['is_walking_now'] != true) continue;
+        final pets = row['pets'];
+        final firstPet = pets is List && pets.isNotEmpty && pets.first is Map
+            ? Map<String, dynamic>.from(pets.first as Map)
+            : null;
+        if (firstPet == null) continue;
+        friendList.add(
+          FriendDogDisplay(
+            name: firstPet['name']?.toString() ?? '친구 반려견',
+            breed: firstPet['breed']?.toString() ?? '',
+            profileImage: resolveMediaUrl(
+              firstPet['profile_image']?.toString(),
+            ),
           ),
         );
-      }).toList();
+      }
 
       final rawPersonalities = petData['personalities'];
       final personalities = rawPersonalities is List
@@ -563,6 +573,7 @@ class ApiService {
         currentDistance:
             (petData['current_distance'] as num?)?.toDouble() ?? 0.0,
         walkingFriends: friendList,
+        walkingFriendsStatusAvailable: walkingFriendsStatusAvailable,
         dailyMissions: missionList,
       );
     } on ApiException {

@@ -184,6 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
             targetDistance: original.targetDistance,
             currentDistance: original.currentDistance,
             walkingFriends: original.walkingFriends,
+            walkingFriendsStatusAvailable:
+                original.walkingFriendsStatusAvailable,
             dailyMissions: original.dailyMissions,
           );
 
@@ -239,7 +241,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             walkPercentage,
                           ),
                           const SizedBox(height: 20),
-                          _buildWalkingFriendsSection(data.walkingFriends),
+                          _buildWalkingFriendsSection(
+                            data.walkingFriends,
+                            statusAvailable: data.walkingFriendsStatusAvailable,
+                          ),
                           const SizedBox(height: 16),
                           _buildAttendanceBanner(),
                           const SizedBox(height: 12),
@@ -484,44 +489,33 @@ class _HomeScreenState extends State<HomeScreen> {
       '퍼그': 'pug.png',
       '사모예드': 'samoyed.png',
       '슈나우저': 'schnauzer.png',
-      '초코': 'poodle.png',
-      '밀크': 'samoyed.png',
-      '토리': 'corgi.png',
-      '휴지': 'bichon.png',
     };
 
-    // 가입 화면/서버의 '골든 리트리버'도 '골든리트리버'와 같은 견종이다.
-    final normalizedKeyword = keyword.replaceAll(RegExp(r'\s+'), '');
-    String fileName = 'maltese.png';
+    final normalized = keyword.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    String? fileName;
     for (final entry in breedFileMap.entries) {
-      if (normalizedKeyword.contains(entry.key)) {
+      final englishName = entry.value
+          .replaceAll('.png', '')
+          .replaceAll('_', '');
+      if (normalized == entry.key ||
+          normalized.replaceAll('_', '') == englishName) {
         fileName = entry.value;
         break;
       }
     }
-
-    final dogAssetPath = 'assets/dogs/$fileName';
-
+    Widget placeholder() => SizedBox(
+      width: size,
+      height: size,
+      child: Icon(Icons.pets, size: size * 0.6, color: const Color(0xFFB5CF9B)),
+    );
+    if (fileName == null) return placeholder();
     return Image.asset(
-      dogAssetPath,
+      'assets/dogs/$fileName',
       width: size,
       height: size,
       fit: BoxFit.contain,
       alignment: Alignment.bottomCenter,
-      errorBuilder: (context, error, stackTrace) {
-        return Image.asset(
-          'assets/images/dog_main.png',
-          width: size,
-          height: size,
-          fit: BoxFit.contain,
-          alignment: Alignment.bottomCenter,
-          errorBuilder: (context, error, stackTrace) => Icon(
-            Icons.pets,
-            size: size * 0.6,
-            color: const Color(0xFFB5CF9B),
-          ),
-        );
-      },
+      errorBuilder: (context, error, stackTrace) => placeholder(),
     );
   }
 
@@ -650,7 +644,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _formatDistanceKm(double value) =>
       value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
 
-  Widget _buildWalkingFriendsSection(List<FriendDogDisplay> friends) {
+  Widget _buildWalkingFriendsSection(
+    List<FriendDogDisplay> friends, {
+    required bool statusAvailable,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -663,6 +660,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        if (!statusAvailable && friends.isNotEmpty) ...[
+          const Text(
+            '산책 상태가 확인된 친구만 표시하고 있어요.',
+            style: TextStyle(fontSize: 12, color: Colors.black45),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (friends.isEmpty)
           Container(
             width: double.infinity,
@@ -671,9 +675,11 @@ class _HomeScreenState extends State<HomeScreen> {
               color: const Color(0xFFEBEFDA),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                '현재 주변에 산책 중인 친구가 없습니다.',
+                statusAvailable
+                    ? '현재 산책 중인 친구가 없습니다.'
+                    : '친구의 산책 상태를 확인할 수 없어요.',
                 style: TextStyle(fontSize: 12, color: Colors.black45),
               ),
             ),
@@ -702,7 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.all(6.0),
                           child: _buildDogImage(
                             friend.profileImage,
-                            friend.name,
+                            friend.breed,
                             size: 52,
                           ),
                         ),
