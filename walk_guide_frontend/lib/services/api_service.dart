@@ -149,21 +149,30 @@ class WalkData {
 // [3. 산책 리포트 뱃지 & 종합 데이터 모델]
 // -----------------------------------------------------------------------------
 class BadgeData {
-  final String title;
+  final int? id;
+  final String title; // 서버의 name; 기존 title 호출도 호환한다.
   final String description;
   final String tagLabel;
+  final String? acquiredAt;
 
   BadgeData({
+    this.id,
     required this.title,
     required this.description,
-    required this.tagLabel,
+    this.tagLabel = '',
+    this.acquiredAt,
   });
 
   factory BadgeData.fromJson(Map<String, dynamic> json) {
+    final name = (json['name'] ?? json['title'])?.toString() ?? '배지';
     return BadgeData(
-      title: json['title']?.toString() ?? '새로운 뱃지 획득!',
-      description: json['description']?.toString() ?? '도감에 새로운 뱃지가 추가되었습니다.',
-      tagLabel: json['tag_label']?.toString() ?? 'Day 1',
+      id: int.tryParse(json['id']?.toString() ?? ''),
+      title: name,
+      description: json['description']?.toString() ?? '',
+      tagLabel:
+          json['tag_label']?.toString() ??
+          (name == '첫 발자국' || name == '첫 발걸음' ? 'Day 1' : ''),
+      acquiredAt: json['acquired_at']?.toString(),
     );
   }
 }
@@ -176,7 +185,10 @@ class WalkReportData {
   final int earnedExp;
   final int expToNextLevel;
   final double expRatio;
-  final BadgeData? newBadge;
+  final List<BadgeData> acquiredBadges;
+  // 기존 호출부가 newBadge를 사용해도 첫 배지에 접근할 수 있다.
+  BadgeData? get newBadge =>
+      acquiredBadges.isEmpty ? null : acquiredBadges.first;
 
   WalkReportData({
     required this.petName,
@@ -186,13 +198,18 @@ class WalkReportData {
     required this.earnedExp,
     required this.expToNextLevel,
     required this.expRatio,
-    this.newBadge,
+    BadgeData? newBadge,
+    List<BadgeData>? acquiredBadges,
     this.hasExperienceData = true,
     this.hasCaloriesData = true,
-  });
+    this.hasEarnedExperienceData = true,
+  }) : acquiredBadges = List<BadgeData>.unmodifiable(
+         acquiredBadges ?? (newBadge == null ? <BadgeData>[] : [newBadge]),
+       );
 
   final bool hasExperienceData;
   final bool hasCaloriesData;
+  final bool hasEarnedExperienceData;
 
   factory WalkReportData.fromJson(
     Map<String, dynamic> json, {
@@ -204,29 +221,49 @@ class WalkReportData {
         value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
     int? asInt(dynamic value) => int.tryParse(value?.toString() ?? '');
     double? asDouble(dynamic value) => double.tryParse(value?.toString() ?? '');
-    final pet = asMap(json['pet']);
-    final nestedWalk = asMap(json['walk']);
-    final walk = nestedWalk.isEmpty ? json : nestedWalk;
+    final fields = {...asMap(json['data']), ...json};
+    final pet = asMap(fields['pet']);
+    final nestedWalk = asMap(fields['walk']);
+    final walk = nestedWalk.isEmpty ? fields : nestedWalk;
     final seconds = asInt(walk['total_duration']);
     final duration =
         walk['total_duration_str']?.toString() ??
         (seconds == null
             ? fallbackDuration ?? '00분 00초'
             : '${seconds ~/ 60}분 ${seconds % 60}초');
-    final earned = asInt(walk['earned_exp'] ?? json['earned_exp']);
-    final next = asInt(pet['exp_to_next_level'] ?? json['exp_to_next_level']);
-    final current = asInt(pet['current_exp'] ?? json['current_exp']);
-    final max = asInt(pet['max_exp'] ?? json['max_exp']);
-    final suppliedRatio = asDouble(pet['exp_ratio'] ?? json['exp_ratio']);
+    final earned = asInt(
+      fields['earned_experience'] ??
+          fields['earned_exp'] ??
+          walk['earned_experience'] ??
+          walk['earned_exp'],
+    );
+    final next = asInt(pet['exp_to_next_level'] ?? fields['exp_to_next_level']);
+    final current = asInt(pet['current_exp'] ?? fields['current_exp']);
+    final max = asInt(pet['max_exp'] ?? fields['max_exp']);
+    final suppliedRatio = asDouble(pet['exp_ratio'] ?? fields['exp_ratio']);
     final ratio =
         suppliedRatio ??
         (current != null && max != null && max > 0 ? current / max : null);
-    final calories = asInt(walk['calories'] ?? json['calories']);
-    final badge = asMap(json['new_badge']);
+    final calories = asInt(walk['calories'] ?? fields['calories']);
+    final badges = <BadgeData>[];
+    final rawBadges = fields['acquired_badges'] ?? walk['acquired_badges'];
+    if (rawBadges is List) {
+      final seenIds = <int>{};
+      for (final item in rawBadges) {
+        if (item is! Map) continue;
+        final badge = BadgeData.fromJson(Map<String, dynamic>.from(item));
+        if (badge.id != null && !seenIds.add(badge.id!)) continue;
+        badges.add(badge);
+      }
+    } else {
+      // 기존 new_badge 응답만 있는 경우 호환. 명시적인 빈 배열은 보상 없음.
+      final oldBadge = asMap(fields['new_badge'] ?? walk['new_badge']);
+      if (oldBadge.isNotEmpty) badges.add(BadgeData.fromJson(oldBadge));
+    }
     return WalkReportData(
       petName:
           pet['name']?.toString() ??
-          json['pet_name']?.toString() ??
+          fields['pet_name']?.toString() ??
           fallbackPetName ??
           '반려견',
       totalDistance:
@@ -238,7 +275,8 @@ class WalkReportData {
       expRatio: (ratio ?? 0.0).clamp(0.0, 1.0).toDouble(),
       hasExperienceData: earned != null && next != null && ratio != null,
       hasCaloriesData: calories != null,
-      newBadge: badge.isEmpty ? null : BadgeData.fromJson(badge),
+      hasEarnedExperienceData: earned != null,
+      acquiredBadges: badges,
     );
   }
 }
@@ -530,13 +568,13 @@ class ApiService {
           .toList();
       final friendRows = (responses[3] as List<dynamic>);
       // 기존 명세에는 산책 상태가 없다. 아래 키는 백엔드 확인이 필요한
-      // 연동 계약: is_walking.
+      // 연동 계약: is_walking_now(boolean). 누락/잘못된 타입은 상태 미확인.
       final walkingFriendsStatusAvailable =
           !friendLookupFailed &&
-          friendRows.every((f) => f is Map && f['is_walking'] is bool);
+          friendRows.every((f) => f is Map && f['is_walking_now'] is bool);
       final friendList = <FriendDogDisplay>[];
       for (final row in friendRows) {
-        if (row is! Map || row['is_walking'] != true) continue;
+        if (row is! Map || row['is_walking_now'] != true) continue;
         final pets = row['pets'];
         final firstPet = pets is List && pets.isNotEmpty && pets.first is Map
             ? Map<String, dynamic>.from(pets.first as Map)
@@ -648,6 +686,7 @@ class ApiService {
   static Future<Map<String, dynamic>> _withReportPet(
     Map<String, dynamic> data,
   ) async {
+    data = {..._walkMap(data), ...data};
     final walk = _walkMap(data['walk'] ?? data);
     final reference = data['pet'] ?? walk['pet'];
     if (reference is Map || data['pet_name'] != null) return data;
@@ -779,7 +818,7 @@ class ApiService {
         expToNextLevel: 22,
         expRatio: 0.72,
         newBadge: BadgeData(
-          title: '새로운 뱃지 획득!',
+          title: '첫 발걸음',
           description: "뱃지 '첫 발걸음'이 도감에 추가되었어요.",
           tagLabel: 'Day 1',
         ),
@@ -802,12 +841,14 @@ class ApiService {
         'total_duration': totalSeconds,
       },
     );
-    var data = _walkMap(body);
+    // 종료 응답 최상위의 acquired_badges/earned_experience를 보존한다.
+    var data = _walkResponseMap(body);
+    final endedWalk = _walkMap(data['walk'] ?? data);
     // 성공한 종료 요청은 다시 보내지 않는다. 응답에 통계가 없으면 상세 조회.
-    if (!data.containsKey('walk') && !data.containsKey('total_distance')) {
+    if (!endedWalk.containsKey('total_distance')) {
       try {
         final details = await getWalkDetails(walkId);
-        data = {...details, ...data};
+        data = {...data, 'walk': _walkMap(details['walk'] ?? details)};
       } catch (_) {
         // 종료 자체는 성공했다. 화면에서 측정한 거리/시간으로 리포트를 표시한다.
       }
@@ -946,7 +987,7 @@ class ApiService {
     }
 
     if (walkId <= 0) throw ArgumentError.value(walkId, 'walkId');
-    return _walkMap(
+    return _walkResponseMap(
       await _authenticatedRequest(
         'GET',
         '/api/walks/$walkId/',

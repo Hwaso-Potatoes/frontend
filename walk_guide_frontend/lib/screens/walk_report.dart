@@ -33,7 +33,7 @@ class WalkReportScreen extends StatelessWidget {
                 width: 110,
                 height: 110,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF9ECA78),
+                  color: Color(0xFFB4D389),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -77,7 +77,8 @@ class WalkReportScreen extends StatelessWidget {
               const SizedBox(height: 18),
 
               // 서버가 경험치 통계를 제공한 경우에만 표시한다.
-              if (reportData.hasExperienceData)
+              if (reportData.hasEarnedExperienceData ||
+                  reportData.hasExperienceData)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
@@ -109,106 +110,39 @@ class WalkReportScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: reportData.expRatio,
-                          minHeight: 10,
-                          backgroundColor: Colors.white24,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(0xFF88C15A),
+                      if (reportData.hasExperienceData) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: reportData.expRatio,
+                            minHeight: 10,
+                            backgroundColor: Colors.white24,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF88C15A),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '다음 진화까지 ${reportData.expToNextLevel} XP 남았어요',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white70,
+                        const SizedBox(height: 8),
+                        Text(
+                          '다음 진화까지 ${reportData.expToNextLevel} XP 남았어요',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               const SizedBox(height: 16),
 
-              // 5. 새로운 뱃지 획득 카드
-              if (reportData.newBadge != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEBEFDA),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFFC7D3B0),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFF75A64C),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.pets,
-                              size: 16,
-                              color: Color(0xFF75A64C),
-                            ),
-                            Text(
-                              reportData.newBadge!.tagLabel,
-                              style: const TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF75A64C),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            reportData.newBadge!.title,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            reportData.newBadge!.description,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ] else
-                const SizedBox(height: 16),
+              // 종료 API가 이번 산책에 지급한 배지만 표시한다.
+              for (final badge in reportData.acquiredBadges) ...[
+                _buildBadgeCard(badge),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 20),
 
               // 6. 하단 버튼
               Row(
@@ -243,6 +177,77 @@ class WalkReportScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadgeCard(BadgeData badge) {
+    return Semantics(
+      label: '새로운 배지 획득: ${badge.title}. ${badge.description}',
+      child: CustomPaint(
+        foregroundPainter: const _DashedBadgeBorder(),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEBEFDA),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFE4F0C9),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x2280964D),
+                      blurRadius: 3,
+                      offset: Offset(1, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: badge.tagLabel == 'Day 1'
+                      ? const _FirstWalkBadgeIcon()
+                      : const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 34,
+                          color: Color(0xFF83865C),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '새로운 뱃지 획득!',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '뱃지 ‘${badge.title}’이 도감에 추가되었어요.',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF838365),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -292,4 +297,96 @@ class WalkReportScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// 첫 산책 배지: 별도 이미지 다운로드 없이 참조 화면의 달력 모양을 그린다.
+class _FirstWalkBadgeIcon extends StatelessWidget {
+  const _FirstWalkBadgeIcon();
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 38,
+    height: 44,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 5,
+          bottom: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFF424733), width: 1),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFAFC985),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Icon(Icons.pets, size: 14, color: Color(0xFF838365)),
+                Text(
+                  'Day 1',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 7,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        for (final left in [7.0, 27.0])
+          Positioned(
+            left: left,
+            top: 1,
+            child: Container(
+              width: 3,
+              height: 9,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: const Color(0xFF424733), width: 0.8),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _DashedBadgeBorder extends CustomPainter {
+  const _DashedBadgeBorder();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0.6, 0.6, size.width - 1.2, size.height - 1.2),
+          const Radius.circular(16),
+        ),
+      );
+    final pen = Paint()
+      ..color = const Color(0xFFA9AC83)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    for (final metric in path.computeMetrics()) {
+      for (double offset = 0; offset < metric.length; offset += 12) {
+        final end = (offset + 7).clamp(0.0, metric.length).toDouble();
+        canvas.drawPath(metric.extractPath(offset, end), pen);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

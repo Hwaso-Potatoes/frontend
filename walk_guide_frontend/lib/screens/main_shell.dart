@@ -38,8 +38,12 @@ class _MainShellScreenState extends State<MainShellScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    ActivePetStore.instance.reset();
-    ActivePetStore.instance.refresh();
+    // Notify store listeners after the initial widget build has finished.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ActivePetStore.instance.reset();
+      ActivePetStore.instance.refresh();
+    });
   }
 
   // 바텀바의 탭 index(0,1,3,4)를 _navigatorKeys 배열 index(0,1,2,3)로 바꿔주는 함수
